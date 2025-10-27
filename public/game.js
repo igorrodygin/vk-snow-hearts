@@ -78,9 +78,7 @@ async function verifyOrderOnServer(appOrderId){
 }
 
 document.getElementById('payAllBtn').addEventListener('click',async()=>{
-  try{
-    await bridge.send('VKWebAppShowOrderBox',{type:'item', item:PRODUCT_ID});
-  }catch{ hapticError(); }
+  try{ await bridge.send('VKWebAppShowOrderBox',{type:'item', item:PRODUCT_ID}); }catch{ hapticError(); }
 });
 
 bridge.subscribe(async ({ detail }) => {

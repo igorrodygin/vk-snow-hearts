@@ -11,15 +11,49 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
+
 app.use(cors());
 app.use(compression());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // для callback VK (x-www-form-urlencoded)
+
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
 function base64url(input){return input.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
 function verifyVKSign(query, secret){const sign=query.sign;if(!sign)return false;const params=Object.keys(query).filter(k=>k.startsWith('vk_')).sort().map(k=>`${k}=${query[k]}`).join('&');const hash=crypto.createHmac('sha256',secret).update(params).digest('base64');return base64url(hash)===sign;}
 
-// Verify endpoint
+// === helpers для подписи VK Payments (sig) ===
+function vkPaymentsCheckSig(params, appSecret) {
+  const sorted = Object.keys(params).filter(k => k !== 'sig').sort().map(k => `${k}=${params[k]}`).join('&');
+  const md5 = crypto.createHash('md5').update(sorted + appSecret).digest('hex');
+  return md5 === String(params.sig || '').toLowerCase();
+}
+
+// ---------- PAYMENTS CALLBACK (для указания в VK настройках) ----------
+app.post('/api/payments/callback', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const { VK_APP_SECRET } = process.env;
+    if (!vkPaymentsCheckSig(body, VK_APP_SECRET)) return res.status(403).send('sig mismatch');
+
+    const { notification_type, status, order_id } = body;
+
+    if (notification_type === 'order_status_change') {
+      if (status === 'chargeable') {
+        const appOrderId = `${Date.now()}_${order_id}`;
+        return res.json({ response: { order_id: Number(order_id), app_order_id: String(appOrderId) } });
+      }
+      if (status === 'paid') return res.json({ response: 1 });
+      return res.json({ response: 1 });
+    }
+    return res.json({ response: 1 });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).send('server error');
+  }
+});
+
+// ---------- VERIFY BY orders.getById (клиентская проверка) ----------
 app.post('/api/orders/verify', async (req,res)=>{
   try{
     const { app_order_id, item_id, vk_params } = req.body||{};
@@ -37,7 +71,7 @@ app.post('/api/orders/verify', async (req,res)=>{
   }catch(e){console.error(e);res.status(500).json({ok:false,error:'server'});}
 });
 
-// Static
+// ---------- STATIC ----------
 app.use(express.static(PUBLIC_DIR,{maxAge:'1h',index:false}));
 app.get('/',(req,res)=>res.sendFile(path.join(PUBLIC_DIR,'index.html')));
 
