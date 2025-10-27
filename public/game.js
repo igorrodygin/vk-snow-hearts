@@ -1,32 +1,13 @@
 // vk-bridge глобально
 const bridge = window.vkBridge;
-
-// Инициализация
 bridge.send('VKWebAppInit').catch(()=>{});
 
-// Флаги поддерживаемых методов и вибро-фолбэк
-const supportsImpact = bridge?.supports?.('VKWebAppTapticImpactOccurred');
-const supportsNotify = bridge?.supports?.('VKWebAppTapticNotificationOccurred');
-
-function hapticImpact(style='light'){
-  if (supportsImpact) return bridge.send('VKWebAppTapticImpactOccurred', { style }).catch(()=>{});
-  if (navigator.vibrate) navigator.vibrate(10);
-}
-function hapticSuccess(){
-  if (supportsNotify) return bridge.send('VKWebAppTapticNotificationOccurred', { type: 'success' }).catch(()=>{});
-  if (navigator.vibrate) navigator.vibrate(30);
-}
-
-// Пользователь (необязательно)
-(async () => {
-  try {
-    const user = await bridge.send('VKWebAppGetUserInfo');
-    document.getElementById('user').textContent = `Привет, ${user.first_name} ${user.last_name}!`;
-  } catch {}
-})();
-
-// Вибрация (кнопка)
-document.getElementById('vibrateBtn').addEventListener('click', () => { hapticSuccess(); });
+// Хаптик включен по умолчанию
+const canImpact = bridge?.supports?.('VKWebAppTapticImpactOccurred');
+const canNotify = bridge?.supports?.('VKWebAppTapticNotificationOccurred');
+function hapticImpact(style='light'){ if (canImpact) bridge.send('VKWebAppTapticImpactOccurred',{style}).catch(()=>{}); else if(navigator.vibrate) navigator.vibrate(10); }
+function hapticSuccess(){ if (canNotify) bridge.send('VKWebAppTapticNotificationOccurred',{type:'success'}).catch(()=>{}); else if(navigator.vibrate) navigator.vibrate(30); }
+function hapticError(){ if (canNotify) bridge.send('VKWebAppTapticNotificationOccurred',{type:'error'}).catch(()=>{}); else if(navigator.vibrate) navigator.vibrate([20,40,20]); }
 
 // Canvas-игра
 const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
@@ -39,7 +20,7 @@ const snow=[], hearts=[];
 
 function rand(a,b){return a+Math.random()*(b-a);} 
 function drawSnowflake(x,y,s){
-  ctx.save();ctx.translate(x,y);ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.lineWidth=1.2;
+  ctx.save();ctx.translate(x,y);ctx.strokeStyle = 'rgba(255,255,255,0.9)';ctx.lineWidth = 1.2;
   for(let i=0;i<6;i++){ctx.rotate(Math.PI/3);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-s);
     ctx.moveTo(0,-s*0.6);ctx.lineTo(s*0.2,-s*0.8);ctx.moveTo(0,-s*0.3);ctx.lineTo(s*0.2,-s*0.5);ctx.stroke();}
   ctx.restore();
@@ -66,15 +47,19 @@ function update(dt){
 function render(){ ctx.clearRect(0,0,W,H); ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fillRect(0,H-18,W,18);
   for(const s of snow) drawSnowflake(s.x,s.y,s.size); for(const h of hearts) drawHeart(h.x,h.y,h.size); }
 let last=performance.now(); function loop(t){ const dt=Math.min(0.033,(t-last)/1000); last=t; spawnSnow(); update(dt); render(); requestAnimationFrame(loop);} requestAnimationFrame(loop);
-canvas.addEventListener('pointerdown',ev=>{ const r=canvas.getBoundingClientRect(),x=ev.clientX-r.left,y=ev.clientY-r.top; let idx=-1,best=1e9;
+
+// Тап/клик — превратить ближайшую снежинку + хаптик
+canvas.addEventListener('pointerdown',ev=>{ 
+  const r=canvas.getBoundingClientRect(),x=ev.clientX-r.left,y=ev.clientY-r.top; 
+  let idx=-1,best=1e9;
   for(let i=0;i<snow.length;i++){ const s=snow[i],d2=(s.x-x)**2+(s.y-y)**2; if(d2<best){best=d2; idx=i;} }
   if(idx>=0){ const s=snow[idx]; hearts.push({x:s.x,y:s.y,vy:-1.2,size:s.size*2.1,life:0}); snow.splice(idx,1); hapticImpact('light'); }
 });
 
-// ===== Монетизация: 1 голос за "Превратить все" =====
-const PRODUCT_ID = 'convert_all_1'; // Создайте такой товар в Платежах VK
+// ===== Монетизация: 1 голос за "Превратить все" + серверная проверка =====
+const PRODUCT_ID = 'convert_all_1'; // создайте такой товар в Платежах VK
 
-function convertAllSnowflakes() {
+function convertAllSnowflakes(){
   for (let i = snow.length - 1; i >= 0; i--) {
     const s = snow[i];
     hearts.push({ x: s.x, y: Math.min(s.y, H-24), vy: -1.2, size: s.size*2.1, life: 0 });
@@ -83,21 +68,28 @@ function convertAllSnowflakes() {
   hapticSuccess();
 }
 
-document.getElementById('payAllBtn').addEventListener('click', async () => {
-  try {
-    await bridge.send('VKWebAppShowOrderBox', { type: 'item', item: PRODUCT_ID });
-  } catch (_) { /* ждём события через subscribe */ }
+async function verifyOrderOnServer(appOrderId){
+  const url='/api/orders/verify';
+  const params=new URLSearchParams(window.location.search);
+  const body={app_order_id:String(appOrderId), item_id:PRODUCT_ID, vk_params:Object.fromEntries(params.entries())};
+  const res=await fetch(url,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  const data=await res.json();
+  return data.ok===true;
+}
+
+document.getElementById('payAllBtn').addEventListener('click',async()=>{
+  try{
+    await bridge.send('VKWebAppShowOrderBox',{type:'item', item:PRODUCT_ID});
+  }catch{ hapticError(); }
 });
 
-bridge.subscribe(({ detail }) => {
-  const { type } = detail || {};
-  if (type === 'VKWebAppOrderSuccess') convertAllSnowflakes();
-  // Можно обрабатывать VKWebAppOrderFail / VKWebAppOrderCancel
+bridge.subscribe(async ({ detail }) => {
+  const { type, data } = detail || {};
+  if (type === 'VKWebAppOrderSuccess') {
+    try { const ok = await verifyOrderOnServer(data.app_order_id); if (ok) convertAllSnowflakes(); else hapticError(); }
+    catch { hapticError(); }
+  }
 });
 
-// Пауза при сворачивании WebView
-bridge.subscribe((e) => {
-  const { type } = e.detail || {}; 
-  if(type === 'VKWebAppViewHide') window.__paused = true;
-  if(type === 'VKWebAppViewRestore') window.__paused = false;
-});
+// Пауза при сворачивании
+bridge.subscribe((e)=>{ const { type } = e.detail||{}; if(type==='VKWebAppViewHide') window.__paused=true; if(type==='VKWebAppViewRestore') window.__paused=false; });
