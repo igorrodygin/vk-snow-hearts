@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Snow ➜ Hearts</title>
   <link rel="stylesheet" href="/styles.css" />
-  <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+  <!-- vk-bridge: используем не-ESM сборку, чтобы избежать CORS для module scripts в WebView --> 
+  <script src="https://cdn.jsdelivr.net/npm/@vkontakte/vk-bridge@2.15.9/dist/browser.min.js"></script>
 </head>
 <body>
   <div id="app">
@@ -17,6 +18,7 @@
     <canvas id="game"></canvas>
     <footer><p>Tap/Click: превратить ближайшую снежинку раньше времени 😉</p></footer>
   </div>
-  <script type="module" src="/game.js"></script>
+  <!-- Загружаем обычный скрипт без type=module -->
+  <script src="/game.js"></script>
 </body>
 </html>
