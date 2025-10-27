@@ -1,8 +1,27 @@
-// vk-bridge доступен как window.vkBridge (загружен в index.html)
+// vk-bridge глобально
 const bridge = window.vkBridge;
 
 // Инициализация
-bridge.send('VKWebAppInit');
+bridge.send('VKWebAppInit').catch(()=>{});
+
+// Функции-помощники для тактильной отдачи с проверкой поддержки и fallback
+const supportsImpact = bridge?.supports?.('VKWebAppTapticImpactOccurred');
+const supportsNotify = bridge?.supports?.('VKWebAppTapticNotificationOccurred');
+
+function hapticImpact(style='light'){
+  if (supportsImpact) {
+    return bridge.send('VKWebAppTapticImpactOccurred', { style }).catch(()=>{});
+  } else if (navigator.vibrate) {
+    navigator.vibrate(10);
+  }
+}
+function hapticSuccess(){
+  if (supportsNotify) {
+    return bridge.send('VKWebAppTapticNotificationOccurred', { type: 'success' }).catch(()=>{});
+  } else if (navigator.vibrate) {
+    navigator.vibrate(30);
+  }
+}
 
 // Пользователь (необязательно)
 (async () => {
@@ -12,10 +31,8 @@ bridge.send('VKWebAppInit');
   } catch {}
 })();
 
-// Вибрация
-document.getElementById('vibrateBtn').addEventListener('click', async () => {
-  try { await bridge.send('VKWebAppTapticNotificationOccurred', { type: 'success' }); } catch {}
-});
+// Вибрация (кнопка)
+document.getElementById('vibrateBtn').addEventListener('click', () => { hapticSuccess(); });
 
 // Canvas-игра
 const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
@@ -47,8 +64,11 @@ function update(dt){
     const s=snow[i];
     s.vy=(s.vy||0)+gravity*dt; s.vx=(s.vx||0)+rand(-0.02,0.02)*dt;
     s.x+=s.vx*dt*60; s.y+=s.vy*dt*60;
-    if(s.y>=H-20){ hearts.push({x:s.x,y:H-24,vy:rand(-1.4,-0.8),size:s.size*2.2,life:0}); snow.splice(i,1);
-      try{ bridge.send('VKWebAppTapticImpactOccurred',{style:'light'}); }catch{} }
+    if(s.y>=H-20){ 
+      hearts.push({x:s.x,y:H-24,vy:rand(-1.4,-0.8),size:s.size*2.2,life:0}); 
+      snow.splice(i,1);
+      hapticImpact('light'); // безопасный вызов
+    }
     else if(s.x<-20||s.x>W+20||s.y>H+40){ snow.splice(i,1); }
   }
   for(let i=hearts.length-1;i>=0;i--){ const h=hearts[i]; h.y+=h.vy*dt*60; h.vy+=0.02*dt; h.life+=dt; if(h.life>2.5) hearts.splice(i,1); }
@@ -58,5 +78,5 @@ function render(){ ctx.clearRect(0,0,W,H); ctx.fillStyle='rgba(255,255,255,0.12)
 let last=performance.now(); function loop(t){ const dt=Math.min(0.033,(t-last)/1000); last=t; spawnSnow(); update(dt); render(); requestAnimationFrame(loop);} requestAnimationFrame(loop);
 canvas.addEventListener('pointerdown',ev=>{ const r=canvas.getBoundingClientRect(),x=ev.clientX-r.left,y=ev.clientY-r.top; let idx=-1,best=1e9;
   for(let i=0;i<snow.length;i++){ const s=snow[i],d2=(s.x-x)**2+(s.y-y)**2; if(d2<best){best=d2; idx=i;} }
-  if(idx>=0){ const s=snow[idx]; hearts.push({x:s.x,y:s.y,vy:-1.2,size:s.size*2.1,life:0}); snow.splice(idx,1); }
+  if(idx>=0){ const s=snow[idx]; hearts.push({x:s.x,y:s.y,vy:-1.2,size:s.size*2.1,life:0}); snow.splice(idx,1); hapticImpact('light'); }
 });
