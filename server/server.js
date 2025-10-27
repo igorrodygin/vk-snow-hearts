@@ -15,30 +15,54 @@ const app = express();
 app.use(cors());
 app.use(compression());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // для callback VK (x-www-form-urlencoded)
+app.use(express.urlencoded({ extended: true })); // VK sends x-www-form-urlencoded for payments
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
+// ---- helpers ----
 function base64url(input){return input.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
 function verifyVKSign(query, secret){const sign=query.sign;if(!sign)return false;const params=Object.keys(query).filter(k=>k.startsWith('vk_')).sort().map(k=>`${k}=${query[k]}`).join('&');const hash=crypto.createHmac('sha256',secret).update(params).digest('base64');return base64url(hash)===sign;}
-
-// === helpers для подписи VK Payments (sig) ===
 function vkPaymentsCheckSig(params, appSecret) {
   const sorted = Object.keys(params).filter(k => k !== 'sig').sort().map(k => `${k}=${params[k]}`).join('&');
   const md5 = crypto.createHash('md5').update(sorted + appSecret).digest('hex');
   return md5 === String(params.sig || '').toLowerCase();
 }
 
-// ---------- PAYMENTS CALLBACK (для указания в VK настройках) ----------
+// ---- catalog ----
+const CATALOG = {
+  convert_all_1: {
+    item_id: 'convert_all_1',
+    title: 'Превратить все снежинки',
+    price: 1, // в голосах
+    // photo_url: 'https://.../icon.png', // опционально
+  }
+};
+
+// ---------- PAYMENTS CALLBACK ----------
 app.post('/api/payments/callback', async (req, res) => {
   try {
     const body = req.body || {};
     const { VK_APP_SECRET } = process.env;
     if (!vkPaymentsCheckSig(body, VK_APP_SECRET)) return res.status(403).send('sig mismatch');
 
-    const { notification_type, status, order_id } = body;
+    const { notification_type } = body;
 
+    // 0) get_item — VK запрашивает данные товара (название/цена)
+    if (notification_type === 'get_item') {
+      const itemId = body.item || body.item_id;
+      const product = CATALOG[itemId];
+      if (!product) return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
+      // минимально необходимый ответ
+      return res.json({ response: {
+        item_id: product.item_id,
+        title: product.title,
+        price: product.price
+      }});
+    }
+
+    // 1) order_status_change — продажа/подтверждение
     if (notification_type === 'order_status_change') {
+      const { status, order_id } = body;
       if (status === 'chargeable') {
         const appOrderId = `${Date.now()}_${order_id}`;
         return res.json({ response: { order_id: Number(order_id), app_order_id: String(appOrderId) } });
@@ -46,6 +70,8 @@ app.post('/api/payments/callback', async (req, res) => {
       if (status === 'paid') return res.json({ response: 1 });
       return res.json({ response: 1 });
     }
+
+    // default OK
     return res.json({ response: 1 });
   } catch (e) {
     console.error(e);
@@ -53,7 +79,7 @@ app.post('/api/payments/callback', async (req, res) => {
   }
 });
 
-// ---------- VERIFY BY orders.getById (клиентская проверка) ----------
+// ---------- VERIFY BY orders.getById (client verify) ----------
 app.post('/api/orders/verify', async (req,res)=>{
   try{
     const { app_order_id, item_id, vk_params } = req.body||{};
@@ -71,7 +97,7 @@ app.post('/api/orders/verify', async (req,res)=>{
   }catch(e){console.error(e);res.status(500).json({ok:false,error:'server'});}
 });
 
-// ---------- STATIC ----------
+// static
 app.use(express.static(PUBLIC_DIR,{maxAge:'1h',index:false}));
 app.get('/',(req,res)=>res.sendFile(path.join(PUBLIC_DIR,'index.html')));
 
