@@ -143,13 +143,16 @@ if (type === 'VKWebAppShowOrderBoxResult') {
   }
 
   async function showBannerOnce() {
-    // ✅ Показываем баннер ТОЛЬКО если метод поддерживается
-    if (!(await bridgeSupports('VKWebAppShowBannerAd'))) return false;
+/*     // ✅ Показываем баннер ТОЛЬКО если метод поддерживается
+    if (!(await bridgeSupports('VKWebAppShowBannerAd'))) return false; */
 
     try {
       const res = await bridge.send('VKWebAppShowBannerAd', {
         banner_location: BANNER_POSITION,
       });
+
+      console.log('VKWebAppShowBannerAd result:', res);
+
       if (res?.result) {
         bannerVisible = true;
         closedByUser = false;
@@ -166,8 +169,8 @@ if (type === 'VKWebAppShowOrderBoxResult') {
   async function ensureBanner(){
     if (closedByUser) return false; // уважаем решение пользователя
     if (bannerVisible) { applyBannerInsets(); return true; }
-    const available = await checkBannerAvailable();
-    if (!available) return false;
+ /*    const available = await checkBannerAvailable();
+    if (!available) return false; */
     return await showBannerOnce();
   }
 
@@ -175,10 +178,10 @@ if (type === 'VKWebAppShowOrderBoxResult') {
     // первый показ через 7 секунд
     clearTimeout(firstTimer);
     firstTimer = setTimeout(async () => {
-      await ensureBanner();
+      await ensureBanner().catch(()=>{});
       // далее — каждые 15 секунд лёгкая попытка (если уже показан — просто поддерживаем инсет)
       clearInterval(periodicTimer);
-      periodicTimer = setInterval(ensureBanner, PERIODIC_INTERVAL_MS);
+      periodicTimer = setInterval(() => { ensureBanner().catch(()=>{}); }, PERIODIC_INTERVAL_MS);
     }, FIRST_SHOW_DELAY_MS);
   }
 
