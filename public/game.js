@@ -95,7 +95,7 @@ document.getElementById('payAllBtn').addEventListener('click', async () => {
 bridge.subscribe(async ({ detail }) => {
   const { type, data } = detail || {};
 
-  if (type === 'VKWebAppOrderSuccess') {
+/*   if (type === 'VKWebAppOrderSuccess') {
     console.log('💰 Успешная покупка:', data);
     try { const ok = await verifyOrderOnServer(data.app_order_id); if (ok) convertAllSnowflakes(); else hapticError(); }
     catch { hapticError(); }
@@ -103,5 +103,19 @@ bridge.subscribe(async ({ detail }) => {
     console.error('⚠️ Ошибка оплаты:', data);
   } else if (type === 'VKWebAppOrderCancel') {
     console.warn('🚫 Покупка отменена пользователем:', data);
+  } */
+
+  bridge.subscribe(async ({ detail }) => {
+  const { type, data } = detail || {};
+  if (type === 'VKWebAppShowOrderBoxResult') {
+    try {
+      const ok = await verifyOrderOnServer(data.order_id); // <-- правильное поле
+      if (ok) convertAllSnowflakes();
+      else hapticError();
+    } catch { hapticError(); }
+  } else if (type === 'VKWebAppShowOrderBoxFailed') {
+    console.error('⚠️ Ошибка оплаты:', data);
   }
+});
+  
 });
