@@ -1,3 +1,15 @@
+
+:root{
+  --banner-bottom-inset: 0px;
+  --banner-top-inset: 0px;
+}
+
+/* Чтобы баннер снизу не перекрывал UI */
+html, body {
+  padding-bottom: var(--banner-bottom-inset);
+  padding-top: var(--banner-top-inset);
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; height: 100%; background: radial-gradient(160% 100% at 50% 0%, #0e1630 0%, #0b1220 60%); color: #fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
 #app { min-height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
