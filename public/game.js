@@ -3,8 +3,8 @@ const bridge = window.vkBridge;
 bridge.send('VKWebAppInit').catch(()=>{});
 
 // Хаптик включен по умолчанию
-const canImpact = await bridgeSupports.('VKWebAppTapticImpactOccurred');
-const canNotify = await bridgeSupports.('VKWebAppTapticNotificationOccurred');
+const canImpact = bridge?.supports?.('VKWebAppTapticImpactOccurred');
+const canNotify = bridge?.supports?.('VKWebAppTapticNotificationOccurred');
 function hapticImpact(style='light'){ if (canImpact) bridge.send('VKWebAppTapticImpactOccurred',{style}).catch(()=>{}); else if(navigator.vibrate) navigator.vibrate(10); }
 function hapticSuccess(){ if (canNotify) bridge.send('VKWebAppTapticNotificationOccurred',{type:'success'}).catch(()=>{}); else if(navigator.vibrate) navigator.vibrate(30); }
 function hapticError(){ if (canNotify) bridge.send('VKWebAppTapticNotificationOccurred',{type:'error'}).catch(()=>{}); else if(navigator.vibrate) navigator.vibrate([20,40,20]); }
