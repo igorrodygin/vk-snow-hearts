@@ -88,6 +88,3 @@ bridge.subscribe(async ({ detail }) => {
     catch { hapticError(); }
   }
 });
-
-// Пауза при сворачивании
-bridge.subscribe((e)=>{ const { type } = e.detail||{}; if(type==='VKWebAppViewHide') window.__paused=true; if(type==='VKWebAppViewRestore') window.__paused=false; });

@@ -24,10 +24,10 @@ function base64url(input){return input.replace(/\+/g,'-').replace(/\//g,'_').rep
 function verifyVKSign(query, secret){const sign=query.sign;if(!sign)return false;const params=Object.keys(query).filter(k=>k.startsWith('vk_')).sort().map(k=>`${k}=${query[k]}`).join('&');const hash=crypto.createHmac('sha256',secret).update(params).digest('base64');return base64url(hash)===sign;}
 function vkPaymentsCheckSig(params, appSecret) { const sorted = Object.keys(params).filter(k => k !== 'sig').sort().map(k => `${k}=${params[k]}`).join('&'); const md5 = crypto.createHash('md5').update(sorted + appSecret).digest('hex'); return md5 === String(params.sig || '').toLowerCase(); }
 
-// catalog
+// catalog for get_item
 const CATALOG = { convert_all_1: { item_id: 'convert_all_1', title: 'Превратить все снежинки', price: 1 } };
 
-// Accept both POST (prod) and GET (debug) to avoid 405 upstream issues
+// Accept both POST and GET to avoid 405
 app.all('/api/payments/callback', async (req, res) => {
   try {
     const body = req.method === 'GET' ? req.query : req.body;
@@ -50,7 +50,6 @@ app.all('/api/payments/callback', async (req, res) => {
         const appOrderId = `${Date.now()}_${order_id}`;
         return res.json({ response: { order_id: Number(order_id), app_order_id: String(appOrderId) } });
       }
-      // paid / cancel -> ack
       return res.json({ response: 1 });
     }
 
@@ -61,7 +60,7 @@ app.all('/api/payments/callback', async (req, res) => {
   }
 });
 
-// verify via orders.getById (unchanged)
+// verify via orders.getById
 app.post('/api/orders/verify', async (req,res)=>{
   try{
     const { app_order_id, item_id, vk_params } = req.body||{};
