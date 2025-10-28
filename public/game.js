@@ -94,8 +94,14 @@ document.getElementById('payAllBtn').addEventListener('click', async () => {
 
 bridge.subscribe(async ({ detail }) => {
   const { type, data } = detail || {};
+
   if (type === 'VKWebAppOrderSuccess') {
+    console.log('💰 Успешная покупка:', data);
     try { const ok = await verifyOrderOnServer(data.app_order_id); if (ok) convertAllSnowflakes(); else hapticError(); }
     catch { hapticError(); }
+  } else if (type === 'VKWebAppOrderFail') {
+    console.error('⚠️ Ошибка оплаты:', data);
+  } else if (type === 'VKWebAppOrderCancel') {
+    console.warn('🚫 Покупка отменена пользователем:', data);
   }
 });
