@@ -36,6 +36,13 @@ app.all('/api/payments/callback', async (req, res) => {
 
     const type = body.notification_type;
 
+    if (type === 'get_item_test') {
+      const itemId = body.item || body.item_id;
+      const product = CATALOG[itemId];
+      if (!product) return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
+      return res.json({ response: { item_id: product.item_id, title: product.title, price: product.price } });
+    }
+
     if (type === 'get_item') {
       const itemId = body.item || body.item_id;
       const product = CATALOG[itemId];
@@ -44,6 +51,16 @@ app.all('/api/payments/callback', async (req, res) => {
     }
 
     if (type === 'order_status_change') {
+      const status = body.status;
+      const order_id = body.order_id;
+      if (status === 'chargeable') {
+        const appOrderId = `${Date.now()}_${order_id}`;
+        return res.json({ response: { order_id: Number(order_id), app_order_id: String(appOrderId) } });
+      }
+      return res.json({ response: 1 });
+    }
+
+    if (type === 'order_status_change_test') {
       const status = body.status;
       const order_id = body.order_id;
       if (status === 'chargeable') {
