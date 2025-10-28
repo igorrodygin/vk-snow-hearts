@@ -3,8 +3,8 @@ const bridge = window.vkBridge;
 bridge.send('VKWebAppInit').catch(()=>{});
 
 // Хаптик включен по умолчанию
-const canImpact = bridge?.supports?.('VKWebAppTapticImpactOccurred');
-const canNotify = bridge?.supports?.('VKWebAppTapticNotificationOccurred');
+const canImpact = await bridgeSupports.('VKWebAppTapticImpactOccurred');
+const canNotify = await bridgeSupports.('VKWebAppTapticNotificationOccurred');
 function hapticImpact(style='light'){ if (canImpact) bridge.send('VKWebAppTapticImpactOccurred',{style}).catch(()=>{}); else if(navigator.vibrate) navigator.vibrate(10); }
 function hapticSuccess(){ if (canNotify) bridge.send('VKWebAppTapticNotificationOccurred',{type:'success'}).catch(()=>{}); else if(navigator.vibrate) navigator.vibrate(30); }
 function hapticError(){ if (canNotify) bridge.send('VKWebAppTapticNotificationOccurred',{type:'error'}).catch(()=>{}); else if(navigator.vibrate) navigator.vibrate([20,40,20]); }
@@ -130,7 +130,7 @@ if (type === 'VKWebAppShowOrderBoxResult') {
 
   async function checkBannerAvailable(){
     try {
-      if (bridge?.supports?.('VKWebAppCheckBannerAd')) {
+      if (await bridgeSupports('VKWebAppCheckBannerAd')) {
         const res = await bridge.send('VKWebAppCheckBannerAd', { banner_location: BANNER_POSITION });
         return !!res?.result;
       }
@@ -144,7 +144,7 @@ if (type === 'VKWebAppShowOrderBoxResult') {
 
   async function showBannerOnce(){
     try {
-      if (!bridge?.supports?.('VKWebAppShowBannerAd')) return false;
+      if (await bridgeSupports('VKWebAppShowBannerAd')) return false;
       const res = await bridge.send('VKWebAppShowBannerAd', { banner_location: BANNER_POSITION });
       const ok = !!res?.result;
       if (ok){
