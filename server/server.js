@@ -98,7 +98,7 @@ app.all('/api/payments/callback', async (req, res) => {
       return res.json({ response: { item_id: product.item_id, title: product.title, price: product.price } });
     }
 
-    if (type === 'order_status_change') {
+    if (type === 'order_status_change' || type === 'order_status_change_test') {
       const status = body.status;
       const order_id = body.order_id;
       if (status === 'chargeable') {
