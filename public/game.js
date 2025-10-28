@@ -68,15 +68,6 @@ function convertAllSnowflakes(){
   hapticSuccess();
 }
 
-async function verifyOrderOnServer(appOrderId){
-  const url='/api/orders/verify';
-  const params=new URLSearchParams(window.location.search);
-  const body={app_order_id:String(appOrderId), item_id:PRODUCT_ID, vk_params:Object.fromEntries(params.entries())};
-  const res=await fetch(url,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  const data=await res.json();
-  return data.ok===true;
-}
-
 document.getElementById('payAllBtn').addEventListener('click', async () => {
   try {
     console.log('🧾 Отправка VKWebAppShowOrderBox...');
@@ -96,16 +87,12 @@ document.getElementById('payAllBtn').addEventListener('click', async () => {
 bridge.subscribe(async ({ detail }) => {
   const { type, data } = detail || {};
 
-  if (type === 'VKWebAppShowOrderBoxResult') {
-    try {
-      // ⚠️ согласовать нейминг с бэком: или order_id везде, или app_order_id везде
-      const ok = await verifyOrderOnServer(data.order_id);
-      if (ok) convertAllSnowflakes();
-      else hapticError();
-    } catch {
-      hapticError();
-    }
-  }
+if (type === 'VKWebAppShowOrderBoxResult') {
+  console.log('✅ Покупка успешна, order_id:', data.order_id);
+  convertAllSnowflakes(); // сразу превращаем снежинки
+} else {
+  hapticError();
+}
 
   if (type === 'VKWebAppShowOrderBoxFailed') {
     console.error('⚠️ ShowOrderBoxFailed:', data);  // один понятный лог
