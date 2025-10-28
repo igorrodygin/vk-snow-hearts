@@ -142,23 +142,26 @@ if (type === 'VKWebAppShowOrderBoxResult') {
     }
   }
 
-  async function showBannerOnce(){
+  async function showBannerOnce() {
+    // ✅ Показываем баннер ТОЛЬКО если метод поддерживается
+    if (!(await bridgeSupports('VKWebAppShowBannerAd'))) return false;
+
     try {
-      if (await bridgeSupports('VKWebAppShowBannerAd')) return false;
-      const res = await bridge.send('VKWebAppShowBannerAd', { banner_location: BANNER_POSITION });
-      const ok = !!res?.result;
-      if (ok){
+      const res = await bridge.send('VKWebAppShowBannerAd', {
+        banner_location: BANNER_POSITION,
+      });
+      if (res?.result) {
         bannerVisible = true;
         closedByUser = false;
-        // высота придёт отдельным событием; но на всякий случай применим инсет
         applyBannerInsets();
+        return true;
       }
-      return ok;
-    } catch (e){
+    } catch (e) {
       console.warn('VKWebAppShowBannerAd error:', e);
-      return false;
     }
+    return false;
   }
+
 
   async function ensureBanner(){
     if (closedByUser) return false; // уважаем решение пользователя
