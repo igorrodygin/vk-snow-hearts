@@ -92,30 +92,23 @@ document.getElementById('payAllBtn').addEventListener('click', async () => {
 });
 
 
+// ОДНА глобальная подписка
 bridge.subscribe(async ({ detail }) => {
   const { type, data } = detail || {};
 
-/*   if (type === 'VKWebAppOrderSuccess') {
-    console.log('💰 Успешная покупка:', data);
-    try { const ok = await verifyOrderOnServer(data.app_order_id); if (ok) convertAllSnowflakes(); else hapticError(); }
-    catch { hapticError(); }
-  } else if (type === 'VKWebAppOrderFail') {
-    console.error('⚠️ Ошибка оплаты:', data);
-  } else if (type === 'VKWebAppOrderCancel') {
-    console.warn('🚫 Покупка отменена пользователем:', data);
-  } */
-
-  bridge.subscribe(async ({ detail }) => {
-  const { type, data } = detail || {};
   if (type === 'VKWebAppShowOrderBoxResult') {
     try {
-      const ok = await verifyOrderOnServer(data.order_id); // <-- правильное поле
+      // ⚠️ согласовать нейминг с бэком: или order_id везде, или app_order_id везде
+      const ok = await verifyOrderOnServer(data.order_id);
       if (ok) convertAllSnowflakes();
       else hapticError();
-    } catch { hapticError(); }
-  } else if (type === 'VKWebAppShowOrderBoxFailed') {
-    console.error('⚠️ Ошибка оплаты:', data);
+    } catch {
+      hapticError();
+    }
   }
-});
-  
+
+  if (type === 'VKWebAppShowOrderBoxFailed') {
+    console.error('⚠️ ShowOrderBoxFailed:', data);  // один понятный лог
+    hapticError();
+  }
 });
