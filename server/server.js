@@ -15,42 +15,86 @@ const app = express();
 app.use(cors());
 app.use(compression());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // for VK payments form POST
+app.use(express.urlencoded({ extended: true })); // VK sends x-www-form-urlencoded
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
-// helpers
-function base64url(input){return input.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
-function verifyVKSign(query, secret){const sign=query.sign;if(!sign)return false;const params=Object.keys(query).filter(k=>k.startsWith('vk_')).sort().map(k=>`${k}=${query[k]}`).join('&');const hash=crypto.createHmac('sha256',secret).update(params).digest('base64');return base64url(hash)===sign;}
-function vkPaymentsCheckSig(params, appSecret) { const sorted = Object.keys(params).filter(k => k !== 'sig').sort().map(k => `${k}=${params[k]}`).join('&'); const md5 = crypto.createHash('md5').update(sorted + appSecret).digest('hex'); return md5 === String(params.sig || '').toLowerCase(); }
+// ===== Helpers =====
+function base64url(input){return input.replace(/\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');}
+function verifyVKSign(query, secret){
+  const sign = query.sign;
+  if(!sign) return false;
+  const params = Object.keys(query)
+    .filter(k => k.startsWith('vk_'))
+    .sort()
+    .map(k => `${k}=${query[k]}`)
+    .join('&');
+  const hash = crypto.createHmac('sha256', secret).update(params).digest('base64');
+  return base64url(hash) === sign;
+}
 
-// catalog for get_item
-const CATALOG = { convert_all_1: { item_id: 'convert_all_1', title: 'Превратить все снежинки', price: 1 } };
+// ---- Tolerant VK Payments signature check (MD5) ----
+function vkPaymentsCheckSig(params, appSecret) {
+  const entries = Object.keys(params)
+    .filter(k => k !== 'sig')
+    .sort()
+    .map(k => `${k}=${params[k]}`);
 
-// Accept both POST and GET to avoid 405
+  const sig = String(params.sig || '').toLowerCase();
+
+  // A) classic (no separators)
+  const plain = entries.join('') + appSecret;
+  const md5Plain = crypto.createHash('md5').update(plain).digest('hex');
+  if (md5Plain === sig) return true;
+
+  // B) docs variant (&-joined)
+  const amp = entries.join('&') + appSecret;
+  const md5Amp = crypto.createHash('md5').update(amp).digest('hex');
+  if (md5Amp === sig) return true;
+
+  return false;
+}
+
+// ===== Debug logging (remove after debug) =====
+const DEBUG_PAY_LOG = process.env.DEBUG_PAY_LOG === '1';
+app.all('/api/payments/callback', (req, res, next) => {
+  if (DEBUG_PAY_LOG) {
+    const body = req.method === 'GET' ? req.query : req.body;
+    console.log('[VK PAY] incoming', req.method, body);
+  }
+  next();
+});
+
+// ===== Catalog for get_item =====
+const CATALOG = {
+  convert_all_1: {
+    item_id: 'convert_all_1',
+    title: 'Превратить все снежинки',
+    price: 1
+  }
+};
+
+// ===== Payments Callback =====
 app.all('/api/payments/callback', async (req, res) => {
   try {
     const body = req.method === 'GET' ? req.query : req.body;
     const { VK_APP_SECRET } = process.env;
-    //if (!vkPaymentsCheckSig(body, VK_APP_SECRET)) return res.status(403).send('sig mismatch');
-    if (process.env.DISABLE_SIG_CHECK !== 'true' && !vkPaymentsCheckSig(body, VK_APP_SECRET)) {
+
+    if (!vkPaymentsCheckSig(body, VK_APP_SECRET)) {
+      if (DEBUG_PAY_LOG) {
+        console.log('[VK PAY] sig mismatch, body=', body);
+      }
       return res.status(403).send('sig mismatch');
     }
 
-
     const type = body.notification_type;
 
-    if (type === 'get_item_test') {
+    if (type === 'get_item' || type === 'get_item_test') {
       const itemId = body.item || body.item_id;
       const product = CATALOG[itemId];
-      if (!product) return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
-      return res.json({ response: { item_id: product.item_id, title: product.title, price: product.price } });
-    }
-
-    if (type === 'get_item') {
-      const itemId = body.item || body.item_id;
-      const product = CATALOG[itemId];
-      if (!product) return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
+      if (!product) {
+        return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
+      }
       return res.json({ response: { item_id: product.item_id, title: product.title, price: product.price } });
     }
 
@@ -61,27 +105,19 @@ app.all('/api/payments/callback', async (req, res) => {
         const appOrderId = `${Date.now()}_${order_id}`;
         return res.json({ response: { order_id: Number(order_id), app_order_id: String(appOrderId) } });
       }
+      // paid / cancel / other — acknowledge
       return res.json({ response: 1 });
     }
 
-    if (type === 'order_status_change_test') {
-      const status = body.status;
-      const order_id = body.order_id;
-      if (status === 'chargeable') {
-        const appOrderId = `${Date.now()}_${order_id}`;
-        return res.json({ response: { order_id: Number(order_id), app_order_id: String(appOrderId) } });
-      }
-      return res.json({ response: 1 });
-    }
-
+    // Fallback OK
     return res.json({ response: 1 });
   } catch (e) {
-    console.error('callback error', e);
+    console.error('[VK PAY] callback error', e);
     return res.status(500).send('server error');
   }
 });
 
-// verify via orders.getById
+// ===== Client verify via orders.getById =====
 app.post('/api/orders/verify', async (req,res)=>{
   try{
     const { app_order_id, item_id, vk_params } = req.body||{};
@@ -99,7 +135,7 @@ app.post('/api/orders/verify', async (req,res)=>{
   }catch(e){console.error(e);res.status(500).json({ok:false,error:'server'});}
 });
 
-// static + health
+// ===== Static & health =====
 app.use(express.static(PUBLIC_DIR,{maxAge:'1h',index:false}));
 app.get('/',(req,res)=>res.sendFile(path.join(PUBLIC_DIR,'index.html')));
 app.get('/health',(_,res)=>res.json({ok:true}));
