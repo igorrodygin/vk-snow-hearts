@@ -33,17 +33,37 @@ function drawHeart(x,y,s){
   ctx.bezierCurveTo(8*k,-2*k,0,-2*k,0,4*k);
   ctx.fillStyle='rgba(255,85,130,0.95)';ctx.fill();ctx.restore();
 }
+
 function spawnSnow(){ if(Math.random()<spawnRate) snow.push({x:rand(0,W),y:-10,vx:rand(-windMax,windMax),vy:rand(0.2,0.6),size:rand(4,9)}); }
+
 function update(dt){
-  for(let i=snow.length-1;i>=0;i--){
-    const s=snow[i];
-    s.vy=(s.vy||0)+gravity*dt; s.vx=(s.vx||0)+rand(-0.02,0.02)*dt;
-    s.x+=s.vx*dt*60; s.y+=s.vy*dt*60;
-    if(s.y>=H-20){ hearts.push({x:s.x,y:H-24,vy:rand(-1.4,-0.8),size:s.size*2.2,life:0}); snow.splice(i,1); /* haptic removed: auto event */ }
-    else if(s.x<-20||s.x>W+20||s.y>H+40){ snow.splice(i,1); }
+  for(let i = snow.length - 1; i >= 0; i--){
+    const s = snow[i];
+    s.vy = (s.vy || 0) + gravity * dt;
+    s.vx = (s.vx || 0) + rand(-0.02, 0.02) * dt;
+    s.x += s.vx * dt * 60;
+    s.y += s.vy * dt * 60;
+
+    // если снежинка достигла земли — превращаем её в сердечко БЕЗ хаптика
+    if (s.y >= H - 20) {
+      hearts.push({ x: s.x, y: H - 24, vy: rand(-1.4, -0.8), size: s.size * 2.2, life: 0 });
+      snow.splice(i, 1);
+      // hapticImpact('light');  <-- УДАЛЕНО
+    }
+    else if (s.x < -20 || s.x > W + 20 || s.y > H + 40) {
+      snow.splice(i, 1);
+    }
   }
-  for(let i=hearts.length-1;i>=0;i--){ const h=hearts[i]; h.y+=h.vy*dt*60; h.vy+=0.02*dt; h.life+=dt; if(h.life>2.5) hearts.splice(i,1); }
+
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    const h = hearts[i];
+    h.y += h.vy * dt * 60;
+    h.vy += 0.02 * dt;
+    h.life += dt;
+    if (h.life > 2.5) hearts.splice(i, 1);
+  }
 }
+
 function render(){ ctx.clearRect(0,0,W,H); ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fillRect(0,H-18,W,18);
   for(const s of snow) drawSnowflake(s.x,s.y,s.size); for(const h of hearts) drawHeart(h.x,h.y,h.size); }
 let last=performance.now(); function loop(t){ const dt=Math.min(0.033,(t-last)/1000); last=t; spawnSnow(); update(dt); render(); requestAnimationFrame(loop);} requestAnimationFrame(loop);
