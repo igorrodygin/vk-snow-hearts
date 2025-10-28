@@ -39,7 +39,7 @@ function update(dt){
     const s=snow[i];
     s.vy=(s.vy||0)+gravity*dt; s.vx=(s.vx||0)+rand(-0.02,0.02)*dt;
     s.x+=s.vx*dt*60; s.y+=s.vy*dt*60;
-    if(s.y>=H-20){ hearts.push({x:s.x,y:H-24,vy:rand(-1.4,-0.8),size:s.size*2.2,life:0}); snow.splice(i,1); hapticImpact('light'); }
+    if(s.y>=H-20){ hearts.push({x:s.x,y:H-24,vy:rand(-1.4,-0.8),size:s.size*2.2,life:0}); snow.splice(i,1); /* haptic removed: auto event */ }
     else if(s.x<-20||s.x>W+20||s.y>H+40){ snow.splice(i,1); }
   }
   for(let i=hearts.length-1;i>=0;i--){ const h=hearts[i]; h.y+=h.vy*dt*60; h.vy+=0.02*dt; h.life+=dt; if(h.life>2.5) hearts.splice(i,1); }
@@ -65,7 +65,7 @@ function convertAllSnowflakes(){
     hearts.push({ x: s.x, y: Math.min(s.y, H-24), vy: -1.2, size: s.size*2.1, life: 0 });
   }
   snow.length = 0;
-  hapticSuccess();
+/* haptic removed: non-tap */
 }
 
 async function verifyOrderOnServer(appOrderId){
@@ -87,7 +87,7 @@ document.getElementById('payAllBtn').addEventListener('click', async () => {
     console.log('✅ Успех VKWebAppShowOrderBox:', result);
   } catch (err) {
     console.error('❌ Ошибка VKWebAppShowOrderBox:', err);
-    hapticError();
+/* haptic removed: non-tap */
   }
 });
 
@@ -98,11 +98,11 @@ if (type === 'VKWebAppShowOrderBoxResult') {
   console.log('✅ Покупка успешна, order_id:', data.order_id);
   convertAllSnowflakes(); // сразу превращаем снежинки
 } else {
-  hapticError();
+/* haptic removed: non-tap */
 }
   if (type === 'VKWebAppShowOrderBoxFailed') {
     console.error('⚠️ ShowOrderBoxFailed:', data);  // один понятный лог
-    hapticError();
+/* haptic removed: non-tap */
   }
 });
 
