@@ -65,7 +65,7 @@ function convertAllSnowflakes(){
     hearts.push({ x: s.x, y: Math.min(s.y, H-24), vy: -1.2, size: s.size*2.1, life: 0 });
   }
   snow.length = 0;
-/* haptic removed: non-tap */
+  hapticSuccess();
 }
 
 async function verifyOrderOnServer(appOrderId){
@@ -87,7 +87,7 @@ document.getElementById('payAllBtn').addEventListener('click', async () => {
     console.log('✅ Успех VKWebAppShowOrderBox:', result);
   } catch (err) {
     console.error('❌ Ошибка VKWebAppShowOrderBox:', err);
-/* haptic removed: non-tap */
+    hapticError();
   }
 });
 
@@ -98,11 +98,11 @@ if (type === 'VKWebAppShowOrderBoxResult') {
   console.log('✅ Покупка успешна, order_id:', data.order_id);
   convertAllSnowflakes(); // сразу превращаем снежинки
 } else {
-/* haptic removed: non-tap */
+hapticError();
 }
   if (type === 'VKWebAppShowOrderBoxFailed') {
     console.error('⚠️ ShowOrderBoxFailed:', data);  // один понятный лог
-/* haptic removed: non-tap */
+hapticError();
   }
 });
 
