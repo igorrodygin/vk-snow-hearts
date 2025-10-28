@@ -77,9 +77,20 @@ async function verifyOrderOnServer(appOrderId){
   return data.ok===true;
 }
 
-document.getElementById('payAllBtn').addEventListener('click',async()=>{
-  try{ await bridge.send('VKWebAppShowOrderBox',{type:'item', item:PRODUCT_ID}); }catch{ hapticError(); }
+document.getElementById('payAllBtn').addEventListener('click', async () => {
+  try {
+    console.log('🧾 Отправка VKWebAppShowOrderBox...');
+    const result = await bridge.send('VKWebAppShowOrderBox', {
+      type: 'item',
+      item: PRODUCT_ID,
+    });
+    console.log('✅ Успех VKWebAppShowOrderBox:', result);
+  } catch (err) {
+    console.error('❌ Ошибка VKWebAppShowOrderBox:', err);
+    hapticError();
+  }
 });
+
 
 bridge.subscribe(async ({ detail }) => {
   const { type, data } = detail || {};
