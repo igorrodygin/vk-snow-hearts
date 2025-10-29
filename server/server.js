@@ -55,7 +55,7 @@ function vkPaymentsCheckSig(params, appSecret) {
   return false;
 }
 
-// ===== Debug logging (remove after debug) =====
+/* // ===== Debug logging (remove after debug) =====
 const DEBUG_PAY_LOG = process.env.DEBUG_PAY_LOG === '1';
 app.all('/api/payments/callback', (req, res, next) => {
   if (DEBUG_PAY_LOG) {
@@ -63,7 +63,7 @@ app.all('/api/payments/callback', (req, res, next) => {
     console.log('[VK PAY] incoming', req.method, body);
   }
   next();
-});
+}); */
 
 // ===== Catalog for get_item =====
 const CATALOG = {
