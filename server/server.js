@@ -135,6 +135,46 @@ app.post('/api/orders/verify', async (req,res)=>{
   }catch(e){console.error(e);res.status(500).json({ok:false,error:'server'});}
 });
 
+
+// ===== Odnoklassniki (OK) Payments =====
+// Signature docs: sig = MD5( concat(sorted key=value without 'sig') + OK_SECRET_KEY )
+function okCheckSig(params, secret) {
+  const parts = Object.keys(params)
+    .filter(k => k !== 'sig')
+    .sort()
+    .map(k => `${k}=${params[k]}`)
+    .join('');
+  const md5 = crypto.createHash('md5').update(parts + secret).digest('hex');
+  return md5 === String(params.sig || '').toLowerCase();
+}
+
+// Optional separate debug flag for OK
+const DEBUG_OK_LOG = process.env.DEBUG_OK_LOG === '1';
+
+// OK payments callback (separate endpoint)
+app.all('/api/ok/callback', async (req, res) => {
+  try {
+    const body = req.method === 'GET' ? req.query : req.body;
+    if (DEBUG_OK_LOG) console.log('[OK PAY] incoming', req.method, body);
+
+    const { OK_SECRET_KEY } = process.env;
+    if (!OK_SECRET_KEY) return res.status(500).send('OK secret missing');
+    if (!okCheckSig(body, OK_SECRET_KEY)) {
+      if (DEBUG_OK_LOG) console.log('[OK PAY] sig mismatch', body);
+      return res.status(403).send('sig mismatch');
+    }
+
+    // Minimal universal OK confirmation
+    // You can branch by body.notification/type if needed
+    // For example: body.type === 'payment' or body.method === 'callbacks.payment'
+    // TODO: map body data to your product catalog if you handle multiple items
+    return res.json({ result: true });
+  } catch (e) {
+    console.error('[OK PAY] callback error', e);
+    return res.status(500).send('server error');
+  }
+});
+
 // ===== Static & health =====
 app.use(express.static(PUBLIC_DIR,{maxAge:'1h',index:false}));
 app.get('/',(req,res)=>res.sendFile(path.join(PUBLIC_DIR,'index.html')));
