@@ -5,9 +5,10 @@
 }
 
 /* Чтобы баннер снизу не перекрывал UI */
+/* Учитываем безопасную зону сверху на iPhone (Dynamic Island / вырез) */
 html, body {
   padding-bottom: var(--banner-bottom-inset);
-  padding-top: var(--banner-top-inset);
+  padding-top: calc(var(--banner-top-inset) + env(safe-area-inset-top, 0px));
 }
 
 * { box-sizing: border-box; }
