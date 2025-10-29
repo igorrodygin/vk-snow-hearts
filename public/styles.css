@@ -5,31 +5,13 @@
 }
 
 /* Чтобы баннер снизу не перекрывал UI */
-
-/* Безопасные отступы сверху и снизу для iPhone (Dynamic Island / вырез) */
 html, body {
-  margin: 0;
-  height: 100%;
-  padding-top: calc(var(--banner-top-inset) + env(safe-area-inset-top, 0px));
-  padding-top: calc(var(--banner-top-inset) + constant(safe-area-inset-top, 0px)); /* iOS 11 legacy */
   padding-bottom: var(--banner-bottom-inset);
-  background: radial-gradient(160% 100% at 50% 0%, #0e1630 0%, #0b1220 60%);
-  color: #fff;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  padding-top: var(--banner-top-inset);
 }
-
-header {
-  padding: calc(12px + env(safe-area-inset-top, 0px)) 16px 12px;
-  padding: calc(12px + constant(safe-area-inset-top, 0px)) 16px 12px; /* iOS 11 legacy */
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: space-between;
-}
-
 
 * { box-sizing: border-box; }
-html, body { height: 100%; background: radial-gradient(160% 100% at 50% 0%, #0e1630 0%, #0b1220 60%); color: #fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+html, body { margin: 0; padding: 0; height: 100%; background: radial-gradient(160% 100% at 50% 0%, #0e1630 0%, #0b1220 60%); color: #fff; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
 #app { min-height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
 header { padding: 12px 16px; display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 header h1 { margin: 0; font-size: 18px; letter-spacing: .3px; }
@@ -39,3 +21,15 @@ header h1 { margin: 0; font-size: 18px; letter-spacing: .3px; }
 .btn-accent { background: rgba(255, 102, 127, .18); border-color: rgba(255, 102, 127, .35); }
 #game { width: 100%; height: 100%; display: block; }
 footer { padding: 10px 16px; opacity: .8; font-size: 13px; text-align: center; }
+
+
+/* === Фикс для iPhone Dynamic Island и прочих вырезов === */
+header {
+  margin-top: 48px; /* фиксированный безопасный отступ сверху */
+}
+
+@media (min-width: 768px) {
+  header {
+    margin-top: 24px; /* меньше отступ на больших экранах */
+  }
+}
