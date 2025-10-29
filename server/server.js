@@ -55,7 +55,7 @@ function vkPaymentsCheckSig(params, appSecret) {
   return false;
 }
 
-/* // ===== Debug logging (remove after debug) =====
+// ===== Debug logging (remove after debug) =====
 const DEBUG_PAY_LOG = process.env.DEBUG_PAY_LOG === '1';
 app.all('/api/payments/callback', (req, res, next) => {
   if (DEBUG_PAY_LOG) {
@@ -63,7 +63,7 @@ app.all('/api/payments/callback', (req, res, next) => {
     console.log('[VK PAY] incoming', req.method, body);
   }
   next();
-}); */
+});
 
 // ===== Catalog for get_item =====
 const CATALOG = {
@@ -136,8 +136,15 @@ app.post('/api/orders/verify', async (req,res)=>{
 });
 
 
-// ===== Odnoklassniki (OK) Payments =====
-// Signature docs: sig = MD5( concat(sorted key=value without 'sig') + OK_SECRET_KEY )
+// ===== Odnoklassniki (OK) Payments — callbacks.payment =====
+// Docs: https://apiok.ru/dev/methods/rest/callbacks/callbacks.payment
+// Works via HTTP GET (per docs), but we accept ALL to be safe and parse from query/body.
+// Response MUST be application/json or application/xml; we return JSON.
+// OK will retry up to 3 times if non-200 or invalid response.
+const DEBUG_OK_LOG = process.env.DEBUG_OK_LOG === '1';
+const OK_ENFORCE_GET = process.env.OK_ENFORCE_GET === '0'; // set to '1' to enforce GET-only
+
+// Compute signature: sig = MD5( concat(sorted key=value, without 'sig') + OK_SECRET_KEY )
 function okCheckSig(params, secret) {
   const parts = Object.keys(params)
     .filter(k => k !== 'sig')
@@ -148,30 +155,68 @@ function okCheckSig(params, secret) {
   return md5 === String(params.sig || '').toLowerCase();
 }
 
-// Optional separate debug flag for OK
-const DEBUG_OK_LOG = process.env.DEBUG_OK_LOG === '1';
+// Simple catalog check (map OK product_code to our items/prices in OKs)
+const OK_CATALOG = {
+  convert_all_1: { price: 1, title: 'Превратить все снежинки' }
+};
 
-// OK payments callback (separate endpoint)
+function okJsonError(code, msg) {
+  // Per docs, error payload shape:
+  // { "error_code": <int>, "error_msg": "<text>", "error_data": null }
+  return { error_code: code, error_msg: msg, error_data: null };
+}
+
+// Endpoint for OK callbacks
 app.all('/api/ok/callback', async (req, res) => {
   try {
-    const body = req.method === 'GET' ? req.query : req.body;
-    if (DEBUG_OK_LOG) console.log('[OK PAY] incoming', req.method, body);
-
-    const { OK_SECRET_KEY } = process.env;
-    if (!OK_SECRET_KEY) return res.status(500).send('OK secret missing');
-    if (!okCheckSig(body, OK_SECRET_KEY)) {
-      if (DEBUG_OK_LOG) console.log('[OK PAY] sig mismatch', body);
-      return res.status(403).send('sig mismatch');
+    if (OK_ENFORCE_GET && req.method !== 'GET') {
+      res.set('Invocation-error', '104'); // Using 104 as generic error per docs
+      return res.status(405).json(okJsonError(104, 'Only GET is allowed by OK docs'));
     }
 
-    // Minimal universal OK confirmation
-    // You can branch by body.notification/type if needed
-    // For example: body.type === 'payment' or body.method === 'callbacks.payment'
-    // TODO: map body data to your product catalog if you handle multiple items
-    return res.json({ result: true });
+    const body = req.method === 'GET' ? req.query : (req.body || {});
+    if (DEBUG_OK_LOG) console.log('[OK PAY] incoming', req.method, body);
+
+    const { OK_SECRET_KEY = '' } = process.env;
+    if (!OK_SECRET_KEY) {
+      res.set('Invocation-error', '2');
+      return res.status(500).json(okJsonError(2, 'SERVICE : OK secret missing'));
+    }
+
+    // signature
+    if (!okCheckSig(body, OK_SECRET_KEY)) {
+      if (DEBUG_OK_LOG) console.log('[OK PAY] sig mismatch', body);
+      res.set('Invocation-error', '104');
+      return res.status(403).json(okJsonError(104, 'PARAM_SIGNATURE : Invalid signature'));
+    }
+
+    // required fields (per docs). Some subscription events may lack transaction_id.
+    const uid = body.uid;
+    const transaction_id = body.transaction_id || '';
+    const amount = Number(body.amount || 0);
+    const product_code = body.product_code || '';
+    const transaction_time = body.transaction_time || '';
+
+    // Optional: validate catalog & price match to prevent tampering
+    if (product_code) {
+      const product = OK_CATALOG[product_code];
+      if (!product) {
+        res.set('Invocation-error', '1001');
+        return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Unknown product_code'));
+      }
+      if (Number.isFinite(product.price) && amount !== Number(product.price)) {
+        res.set('Invocation-error', '1001');
+        return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Amount mismatch'));
+      }
+    }
+
+    // Success confirmation
+    res.type('application/json');
+    return res.status(200).send(true);
   } catch (e) {
     console.error('[OK PAY] callback error', e);
-    return res.status(500).send('server error');
+    res.set('Invocation-error', '9999');
+    return res.status(500).json(okJsonError(9999, 'SYSTEM : server error'));
   }
 });
 
