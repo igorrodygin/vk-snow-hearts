@@ -250,26 +250,39 @@ if (type === 'VKWebAppShowOrderBoxResult') {
 // ===== /Banner Ads =====
 
 
-// ===== Subscription test button (for OK/VK env) =====
+// ===== Subscription test button (VKWebAppShowSubscriptionBox) =====
 (function(){
   const method = 'VKWebAppShowSubscriptionBox';
   const btn = document.getElementById('subBtn');
+  const sel = document.getElementById('subAction');
+  const inputId = document.getElementById('subId');
+
   function log(...args){ try { console.log('[SUB]', ...args); } catch(e){} }
-  if (btn){
-    btn.addEventListener('click', async () => {
-      const supported = !!(bridge && bridge.supports && bridge.supports(method));
-      log('click -> call', method, 'supported=', supported);
-      try {
-        const res = await bridge.send(method, {});
-        log('result:', res);
-        alert('VKWebAppShowSubscriptionBox result: ' + JSON.stringify(res));
-      } catch (err) {
-        log('error:', err);
-        alert('VKWebAppShowSubscriptionBox error: ' + JSON.stringify(err));
-      }
-    });
-  } else {
-    log('no #subBtn found in DOM');
-  }
+
+  if (!btn) { log('no #subBtn found in DOM'); return; }
+
+  btn.addEventListener('click', async () => {
+    const supported = !!(bridge && bridge.supports && bridge.supports(method));
+    const action = (sel && sel.value) || 'create';
+    const subscription_id = (inputId && inputId.value.trim()) || undefined;
+
+    // ✅ Обязательные параметры для теста подписки
+    const params = {
+      action,                                // create / cancel
+      item: 'subscription_convert_all_1',    // идентификатор подписки
+    };
+    if (subscription_id) params.subscription_id = subscription_id;
+
+    log('click ->', method, 'supported=', supported, 'params=', params);
+    try {
+      const res = await bridge.send(method, params);
+      log('result:', res);
+      alert('VKWebAppShowSubscriptionBox result: ' + JSON.stringify(res));
+    } catch (err) {
+      log('error:', err);
+      const detail = err && (err.error_data || err.data || err.message || err.toString());
+      alert('VKWebAppShowSubscriptionBox error: ' + JSON.stringify(detail));
+    }
+  });
 })();
 // ===== /Subscription test =====
