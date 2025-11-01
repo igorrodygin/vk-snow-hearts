@@ -166,8 +166,8 @@ function okJsonError(code, msg) {
   return { error_code: code, error_msg: msg, error_data: null };
 }
 
-// Endpoint for OK callbacks
-app.all('/api/ok/callback', async (req, res) => {
+// Endpoint for OK callbacks (OK может вызывать и /api/payments/callback)
+app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
   try {
     if (OK_ENFORCE_GET && req.method !== 'GET') {
       res.set('Invocation-error', '104'); // Using 104 as generic error per docs
