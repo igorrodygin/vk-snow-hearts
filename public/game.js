@@ -249,3 +249,27 @@ if (type === 'VKWebAppShowOrderBoxResult') {
 })();
 // ===== /Banner Ads =====
 
+
+// ===== Subscription test button (for OK/VK env) =====
+(function(){
+  const method = 'VKWebAppShowSubscriptionBox';
+  const btn = document.getElementById('subBtn');
+  function log(...args){ try { console.log('[SUB]', ...args); } catch(e){} }
+  if (btn){
+    btn.addEventListener('click', async () => {
+      const supported = !!(bridge && bridge.supports && bridge.supports(method));
+      log('click -> call', method, 'supported=', supported);
+      try {
+        const res = await bridge.send(method, {});
+        log('result:', res);
+        alert('VKWebAppShowSubscriptionBox result: ' + JSON.stringify(res));
+      } catch (err) {
+        log('error:', err);
+        alert('VKWebAppShowSubscriptionBox error: ' + JSON.stringify(err));
+      }
+    });
+  } else {
+    log('no #subBtn found in DOM');
+  }
+})();
+// ===== /Subscription test =====
