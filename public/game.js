@@ -251,73 +251,57 @@ if (type === 'VKWebAppShowOrderBoxResult') {
 
 // ===== Native Ads: Interstitial & Rewarded =====
 (function(){
-  const btnInterstitial = document.getElementById('showInterstitialBtn');
-  const btnReward = document.getElementById('showRewardBtn');
+const btnInterstitial = document.getElementById('showInterstitialBtn');
+const btnReward = document.getElementById('showRewardBtn');
 
-  // Универсальные хелперы
-  async function canShow(ad_format){
+if (btnInterstitial) {
+  btnInterstitial.addEventListener('click', async () => {
+    logAd('CheckNativeAds_call', { format: 'interstitial' });
+    let chk, res;
     try {
-      const res = await bridge.send('VKWebAppCheckNativeAds', { ad_format });
-      console.log(`[ads] CheckNativeAds(${ad_format}):`, res);
-      return !!res?.result;
+      chk = await bridge.send('VKWebAppCheckNativeAds', { ad_format: 'interstitial' });
+      logAd('CheckNativeAds_result', { format: 'interstitial', result: chk });
     } catch (e) {
-      console.warn(`[ads] CheckNativeAds(${ad_format}) error:`, e);
-      return false;
+      logAd('CheckNativeAds_error', { format: 'interstitial', error: String(e) });
+      return;
     }
-  }
 
-  async function showNative(ad_format){
+    if (!chk?.result) return; // нет инвентаря — просто фиксируем логом выше
+
+    logAd('ShowNativeAds_call', { format: 'interstitial' });
     try {
-      const res = await bridge.send('VKWebAppShowNativeAds', { ad_format });
-      console.log(`[ads] ShowNativeAds(${ad_format}):`, res);
-      return !!res?.result;
+      res = await bridge.send('VKWebAppShowNativeAds', { ad_format: 'interstitial' });
+      logAd('ShowNativeAds_result', { format: 'interstitial', result: res });
     } catch (e) {
-      console.warn(`[ads] ShowNativeAds(${ad_format}) error:`, e);
-      return false;
+      logAd('ShowNativeAds_error', { format: 'interstitial', error: String(e) });
     }
-  }
+  });
+}
 
-  // Публичные функции (можно использовать из игры)
-  window.showInterstitialAd = async function(){
-    if (!(await canShow('interstitial'))) {
-      console.log('[ads] interstitial недоступен сейчас');
-      return false;
+if (btnReward) {
+  btnReward.addEventListener('click', async () => {
+    logAd('CheckNativeAds_call', { format: 'reward' });
+    let chk, res;
+    try {
+      chk = await bridge.send('VKWebAppCheckNativeAds', { ad_format: 'reward' });
+      logAd('CheckNativeAds_result', { format: 'reward', result: chk });
+    } catch (e) {
+      logAd('CheckNativeAds_error', { format: 'reward', error: String(e) });
+      return;
     }
-    const ok = await showNative('interstitial');
-    if (ok) hapticSuccess(); else hapticError();
-    return ok;
-  };
 
-  window.showRewardAd = async function(onReward){
-    // Проверяем наличие rewarded
-    if (!(await canShow('reward'))) {
-      console.log('[ads] reward недоступен сейчас');
-      return false;
+    if (!chk?.result) return;
+
+    logAd('ShowNativeAds_call', { format: 'reward' });
+    try {
+      res = await bridge.send('VKWebAppShowNativeAds', { ad_format: 'reward' });
+      logAd('ShowNativeAds_result', { format: 'reward', result: res });
+      // если хочешь — здесь выдавай награду, если res?.result === true
+    } catch (e) {
+      logAd('ShowNativeAds_error', { format: 'reward', error: String(e) });
     }
-    const ok = await showNative('reward');
-    // В VK результат == true означает успешный показ (пользователь досмотрел).
-    // Доп. серверной верификации SDK не даёт — логику награды реализуем на клиенте/сервере самостоятельно.
-    if (ok) {
-      try { onReward && onReward(); } catch(e){}
-      hapticSuccess();
-    } else {
-      hapticError();
-    }
-    return ok;
-  };
-  // Демо-кнопки
-  if (btnInterstitial) {
-    btnInterstitial.addEventListener('click', () => { window.showInterstitialAd(); });
-  }
-  if (btnReward) {
-    btnReward.addEventListener('click', () => {
-      // Пример награды: «превратить все снежинки» за просмотр
-      window.showRewardAd(() => {
-        console.log('[ads] reward completed → выдаём награду');
-        convertAllSnowflakes();
-      });
-    });
-  }
+  });
+}
 })();
 // ===== /Native Ads =====
 
@@ -357,3 +341,17 @@ if (type === 'VKWebAppShowOrderBoxResult') {
   });
 })();
 // ===== /Subscription test =====
+
+// --- очень короткий логгер на бек ---
+function logAd(event, data) {
+  try {
+    const payload = JSON.stringify({ source: 'client', event, data, t: Date.now() });
+    const blob = new Blob([payload], { type: 'application/json' });
+    navigator.sendBeacon('/log', blob);
+  } catch (e) {
+    // запасной вариант
+    fetch('/log', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source: 'client', event, data, t: Date.now() }), keepalive: true })
+      .catch(()=>{});
+  }
+}

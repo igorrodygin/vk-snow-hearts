@@ -227,3 +227,11 @@ app.get('/health',(_,res)=>res.json({ok:true}));
 
 const PORT=process.env.PORT||8080;
 app.listen(PORT,()=>console.log('Server listening on :'+PORT));
+
+// --- ЛОГИРОВАНИЕ РЕКЛАМЫ ---
+app.use(express.json()); // если уже есть — второй раз не добавляй
+
+app.post('/log', (req, res) => {
+  console.log('[AD]', req.body); // смотри тут всё, что прилетает с клиента
+  res.sendStatus(204);
+});
