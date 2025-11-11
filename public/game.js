@@ -88,14 +88,14 @@ function convertAllSnowflakes(){
 /* haptic removed: non-tap */
 }
 
-async function verifyOrderOnServer(appOrderId){
+/* async function verifyOrderOnServer(appOrderId){
   const url='/api/orders/verify';
   const params=new URLSearchParams(window.location.search);
   const body={app_order_id:String(appOrderId), item_id:PRODUCT_ID, vk_params:Object.fromEntries(params.entries())};
   const res=await fetch(url,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
   const data=await res.json();
   return data.ok===true;
-}
+} */
 
 document.getElementById('payAllBtn').addEventListener('click', async () => {
   try {
@@ -249,6 +249,77 @@ if (type === 'VKWebAppShowOrderBoxResult') {
 })();
 // ===== /Banner Ads =====
 
+// ===== Native Ads: Interstitial & Rewarded =====
+(function(){
+  const btnInterstitial = document.getElementById('showInterstitialBtn');
+  const btnReward = document.getElementById('showRewardBtn');
+
+  // Универсальные хелперы
+  async function canShow(ad_format){
+    try {
+      const res = await bridge.send('VKWebAppCheckNativeAds', { ad_format });
+      console.log(`[ads] CheckNativeAds(${ad_format}):`, res);
+      return !!res?.result;
+    } catch (e) {
+      console.warn(`[ads] CheckNativeAds(${ad_format}) error:`, e);
+      return false;
+    }
+  }
+
+  async function showNative(ad_format){
+    try {
+      const res = await bridge.send('VKWebAppShowNativeAds', { ad_format });
+      console.log(`[ads] ShowNativeAds(${ad_format}):`, res);
+      return !!res?.result;
+    } catch (e) {
+      console.warn(`[ads] ShowNativeAds(${ad_format}) error:`, e);
+      return false;
+    }
+  }
+
+  // Публичные функции (можно использовать из игры)
+  window.showInterstitialAd = async function(){
+    if (!(await canShow('interstitial'))) {
+      console.log('[ads] interstitial недоступен сейчас');
+      return false;
+    }
+    const ok = await showNative('interstitial');
+    if (ok) hapticSuccess(); else hapticError();
+    return ok;
+  };
+
+  window.showRewardAd = async function(onReward){
+    // Проверяем наличие rewarded
+    if (!(await canShow('reward'))) {
+      console.log('[ads] reward недоступен сейчас');
+      return false;
+    }
+    const ok = await showNative('reward');
+    // В VK результат == true означает успешный показ (пользователь досмотрел).
+    // Доп. серверной верификации SDK не даёт — логику награды реализуем на клиенте/сервере самостоятельно.
+    if (ok) {
+      try { onReward && onReward(); } catch(e){}
+      hapticSuccess();
+    } else {
+      hapticError();
+    }
+    return ok;
+  };
+  // Демо-кнопки
+  if (btnInterstitial) {
+    btnInterstitial.addEventListener('click', () => { window.showInterstitialAd(); });
+  }
+  if (btnReward) {
+    btnReward.addEventListener('click', () => {
+      // Пример награды: «превратить все снежинки» за просмотр
+      window.showRewardAd(() => {
+        console.log('[ads] reward completed → выдаём награду');
+        convertAllSnowflakes();
+      });
+    });
+  }
+})();
+// ===== /Native Ads =====
 
 // ===== Subscription test button (VKWebAppShowSubscriptionBox) =====
 (function(){
