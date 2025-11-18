@@ -60,7 +60,7 @@ const DEBUG_PAY_LOG = process.env.DEBUG_PAY_LOG === '1';
 app.all('/api/payments/callback', (req, res, next) => {
   //if (DEBUG_PAY_LOG) {
     const body = req.method === 'GET' ? req.query : req.body;
-    console.log('[VK PAY] incoming', req.method, body);
+    console.log('[VK PAY][REQ]', req.method, body);
   //}
   next();
 });
@@ -95,8 +95,10 @@ app.all('/api/payments/callback', async (req, res) => {
       if (!product) {
         return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
       }
-      console.log('[VK PAY] response', res.method, res.body);
-      return res.json({ response: { item_id: product.item_id, title: product.title, price: product.price } });
+      const payload = { response: { item_id: product.item_id, title: product.title, price: product.price } };
+      console.log('[VK PAY][RES]', 200, payload);
+      return res.json(payload);
+
     }
 
     if (type === 'order_status_change' || type === 'order_status_change_test') {
@@ -104,11 +106,14 @@ app.all('/api/payments/callback', async (req, res) => {
       const order_id = body.order_id;
       if (status === 'chargeable') {
         const appOrderId = `${Date.now()}_${order_id}`;
-        console.log('[VK PAY] response', res.method, res.body);
-        return res.json({ response: { order_id: Number(order_id), app_order_id: String(appOrderId) } });
+        const payload = { response: { order_id: Number(order_id), app_order_id: String(appOrderId) } };
+        console.log('[VK PAY][RES]', 200, payload);
+        return res.json(payload);
       }
       // paid / cancel / other — acknowledge
-      return res.json({ response: 1 });
+      const payload = { response: 1 };
+      console.log('[VK PAY][RES]', 200, payload);
+      return res.json(payload);
     }
 
     // Fallback OK
@@ -177,7 +182,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
     }
 
     const body = req.method === 'GET' ? req.query : (req.body || {});
-    if (DEBUG_OK_LOG) console.log('[OK PAY] incoming', req.method, body);
+    if (DEBUG_OK_LOG) console.log('[OK PAY][REQ]', req.method, body);
 
     const { OK_SECRET_KEY = '' } = process.env;
     if (!OK_SECRET_KEY) {
@@ -214,6 +219,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
 
     // Success confirmation
     res.type('application/json');
+    console.log('[OK PAY][RES]', 200, true);
     return res.status(200).send(true);
   } catch (e) {
     console.error('[OK PAY] callback error', e);
