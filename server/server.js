@@ -95,7 +95,7 @@ app.all('/api/payments/callback', async (req, res) => {
       if (!product) {
         return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
       }
-      console.log(res.json())
+      console.log(res.body)
       return res.json({ response: { item_id: product.item_id, title: product.title, price: product.price } });
     }
 
@@ -104,7 +104,7 @@ app.all('/api/payments/callback', async (req, res) => {
       const order_id = body.order_id;
       if (status === 'chargeable') {
         const appOrderId = `${Date.now()}_${order_id}`;
-        console.log(res.json())
+        console.log(res.body)
         return res.json({ response: { order_id: Number(order_id), app_order_id: String(appOrderId) } });
       }
       // paid / cancel / other — acknowledge
