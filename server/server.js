@@ -232,7 +232,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], fullHttpLogger, async (r
     }
 
     const body = req.method === 'GET' ? req.query : (req.body || {});
-    if (DEBUG_OK_LOG) console.log('[OK PAY][REQ]', req.method, body);
+    //if (DEBUG_OK_LOG) console.log('[OK PAY][REQ]', req.method, body);
 
     const { OK_SECRET_KEY = '' } = process.env;
     if (!OK_SECRET_KEY) {
@@ -242,7 +242,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], fullHttpLogger, async (r
 
     // signature
     if (!okCheckSig(body, OK_SECRET_KEY)) {
-      if (DEBUG_OK_LOG) console.log('[OK PAY] sig mismatch', body);
+      //if (DEBUG_OK_LOG) console.log('[OK PAY] sig mismatch', body);
       res.set('Invocation-error', '104');
       return res.status(403).json(okJsonError(104, 'PARAM_SIGNATURE : Invalid signature'));
     }
@@ -269,10 +269,10 @@ app.all(['/api/ok/callback', '/api/payments/callback'], fullHttpLogger, async (r
 
     // Success confirmation
     res.type('application/json');
-    console.log('[OK PAY][RES]', 200, true);
+    //console.log('[OK PAY][RES]', 200, true);
     return res.status(200).send(true);
   } catch (e) {
-    console.error('[OK PAY] callback error', e);
+    //console.error('[OK PAY] callback error', e);
     res.set('Invocation-error', '9999');
     return res.status(500).json(okJsonError(9999, 'SYSTEM : server error'));
   }
