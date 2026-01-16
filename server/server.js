@@ -96,7 +96,7 @@ app.all('/api/payments/callback', async (req, res) => {
         return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
       }
       const payload = { response: { item_id: product.item_id, title: product.title, price: product.price } };
-      console.log('[VK PAY][RES]', 200, payload);
+      //console.log('[VK PAY][RES]', 200, payload);
       return res.json(payload);
 
     }
@@ -107,12 +107,12 @@ app.all('/api/payments/callback', async (req, res) => {
       if (status === 'chargeable') {
         const appOrderId = `${Date.now()}_${order_id}`;
         const payload = { response: { order_id: Number(order_id), app_order_id: String(appOrderId) } };
-        console.log('[VK PAY][RES]', 200, payload);
+        //console.log('[VK PAY][RES]', 200, payload);
         return res.json(payload);
       }
       // paid / cancel / other — acknowledge
       const payload = { response: 1 };
-      console.log('[VK PAY][RES]', 200, payload);
+      //console.log('[VK PAY][RES]', 200, payload);
       return res.json(payload);
     }
 
