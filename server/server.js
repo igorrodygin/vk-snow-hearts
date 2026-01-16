@@ -164,7 +164,7 @@ function okCheckSig(params, secret) {
 
 // Simple catalog check (map OK product_code to our items/prices in OKs)
 const OK_CATALOG = {
-  convert_all_1: { price: 1, title: 'Превратить все снежинки' }
+  convert_all_1: { price: 2, title: 'Превратить все снежинки' }
 };
 
 function okJsonError(code, msg) {
@@ -211,7 +211,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
         res.set('Invocation-error', '1001');
         return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Unknown product_code'));
       }
-      if (Number.isFinite(product.price) && amount == Number(product.price)) {
+      if (Number.isFinite(product.price) && amount !== Number(product.price)) {
         res.set('Invocation-error', '1001');
         return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Amount mismatch'));
       }
