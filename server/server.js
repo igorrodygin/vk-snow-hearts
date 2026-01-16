@@ -213,6 +213,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
       }
       if (Number.isFinite(product.price) && amount == Number(product.price)) {
         res.set('Invocation-error', '1001');
+        console.log(res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Amount mismatch')));
         return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Amount mismatch'));
       }
     }
