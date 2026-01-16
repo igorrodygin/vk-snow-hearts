@@ -148,7 +148,7 @@ app.post('/api/orders/verify', async (req,res)=>{
 // Works via HTTP GET (per docs), but we accept ALL to be safe and parse from query/body.
 // Response MUST be application/json or application/xml; we return JSON.
 // OK will retry up to 3 times if non-200 or invalid response.
-const DEBUG_OK_LOG = process.env.DEBUG_OK_LOG === '1';
+const DEBUG_OK_LOG = process.env.DEBUG_OK_LOG === '0';
 const OK_ENFORCE_GET = process.env.OK_ENFORCE_GET === '0'; // set to '1' to enforce GET-only
 
 // Compute signature: sig = MD5( concat(sorted key=value, without 'sig') + OK_SECRET_KEY )
