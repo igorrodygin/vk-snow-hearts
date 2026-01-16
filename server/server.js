@@ -74,7 +74,57 @@ const CATALOG = {
   }
 };
 
+function fullHttpLogger(req, res, next) {
+  const start = Date.now();
+
+  console.log('\n==================== HTTP IN ====================');
+  console.log('TIME:   ', new Date().toISOString());
+  console.log('REMOTE: ', req.ip);
+  console.log('METHOD: ', req.method);
+  console.log('URL:    ', req.originalUrl);
+  console.log('HEADERS:', req.headers);
+  console.log('QUERY:  ', req.query);
+  console.log('BODY:   ', req.body);
+
+  if (req.rawBody) {
+    console.log('RAWBODY:', req.rawBody.toString('utf8'));
+  } else {
+    console.log('RAWBODY: <no rawBody captured>');
+  }
+
+  // --- capture response ---
+  const chunks = [];
+  const origWrite = res.write.bind(res);
+  const origEnd = res.end.bind(res);
+
+  res.write = (chunk, encoding, cb) => {
+    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
+    return origWrite(chunk, encoding, cb);
+  };
+
+  res.end = (chunk, encoding, cb) => {
+    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
+    return origEnd(chunk, encoding, cb);
+  };
+
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    const body = Buffer.concat(chunks).toString('utf8');
+
+    console.log('==================== HTTP OUT ===================');
+    console.log('TIME:   ', new Date().toISOString());
+    console.log('STATUS: ', res.statusCode);
+    console.log('HEADERS:', res.getHeaders());
+    console.log('BODY:   ', body);
+    console.log('DUR_MS: ', ms);
+    console.log('=================================================\n');
+  });
+
+  next();
+}
+
 // ===== Payments Callback =====
+app.use(['/api/payments/callback'], fullHttpLogger);
 app.all('/api/payments/callback', async (req, res) => {
   try {
     const body = req.method === 'GET' ? req.query : req.body;
@@ -173,59 +223,6 @@ function okJsonError(code, msg) {
   return { error_code: code, error_msg: msg, error_data: null };
 }
 
-function fullHttpLogger(req, res, next) {
-  const start = Date.now();
-
-  console.log('\n==================== HTTP IN ====================');
-  console.log('TIME:   ', new Date().toISOString());
-  console.log('REMOTE: ', req.ip);
-  console.log('METHOD: ', req.method);
-  console.log('URL:    ', req.originalUrl);
-  console.log('HEADERS:', req.headers);
-  console.log('QUERY:  ', req.query);
-  console.log('BODY:   ', req.body);
-
-  if (req.rawBody) {
-    console.log('RAWBODY:', req.rawBody.toString('utf8'));
-  } else {
-    console.log('RAWBODY: <no rawBody captured>');
-  }
-
-  // --- capture response ---
-  const chunks = [];
-  const origWrite = res.write.bind(res);
-  const origEnd = res.end.bind(res);
-
-  res.write = (chunk, encoding, cb) => {
-    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
-    return origWrite(chunk, encoding, cb);
-  };
-
-  res.end = (chunk, encoding, cb) => {
-    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
-    return origEnd(chunk, encoding, cb);
-  };
-
-  res.on('finish', () => {
-    const ms = Date.now() - start;
-    const body = Buffer.concat(chunks).toString('utf8');
-
-    console.log('==================== HTTP OUT ===================');
-    console.log('TIME:   ', new Date().toISOString());
-    console.log('REMOTE: ', req.ip);
-    console.log('METHOD: ', req.method);
-    console.log('URL:    ', req.originalUrl);
-    console.log('STATUS: ', res.statusCode);
-    console.log('HEADERS:', res.getHeaders());
-    console.log('BODY:   ', body);
-    console.log('DUR_MS: ', ms);
-    console.log('=================================================\n');
-  });
-
-  next();
-}
-
-
 // Endpoint for OK callbacks (OK может вызывать и /api/payments/callback)
 app.use(['/api/ok/callback', '/api/payments/callback'], fullHttpLogger);
 app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
@@ -267,7 +264,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
       }
       if (Number.isFinite(product.price) && amount == Number(product.price)) {
         res.set('Invocation-error', '1001');
-        return res.status(200).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Amount mismatch'));
+        return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Amount mismatch'));
       }
     }
 
