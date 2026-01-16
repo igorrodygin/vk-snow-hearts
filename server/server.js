@@ -224,7 +224,8 @@ function fullHttpLogger(req, res, next) {
 
 
 // Endpoint for OK callbacks (OK может вызывать и /api/payments/callback)
-app.all(['/api/ok/callback', '/api/payments/callback'], fullHttpLogger, async (req, res) => {
+app.use(['/api/ok/callback', '/api/payments/callback'], fullHttpLogger);
+app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
   try {
     if (OK_ENFORCE_GET && req.method !== 'GET') {
       res.set('Invocation-error', '104'); // Using 104 as generic error per docs
