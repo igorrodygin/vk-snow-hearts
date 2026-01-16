@@ -164,7 +164,7 @@ function okCheckSig(params, secret) {
 
 // Simple catalog check (map OK product_code to our items/prices in OKs)
 const OK_CATALOG = {
-  convert_all_1: { price: 2, title: 'Превратить все снежинки' }
+  convert_all_1: { price: 1, title: 'Превратить все снежинки' }
 };
 
 function okJsonError(code, msg) {
