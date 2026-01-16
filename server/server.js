@@ -56,7 +56,7 @@ function vkPaymentsCheckSig(params, appSecret) {
 }
 
 // ===== Debug logging (remove after debug) =====
-const DEBUG_PAY_LOG = process.env.DEBUG_PAY_LOG === '1';
+const DEBUG_PAY_LOG = process.env.DEBUG_PAY_LOG === '0';
 app.all('/api/payments/callback', (req, res, next) => {
   //if (DEBUG_PAY_LOG) {
     const body = req.method === 'GET' ? req.query : req.body;
