@@ -212,6 +212,9 @@ function fullHttpLogger(req, res, next) {
 
     console.log('==================== HTTP OUT ===================');
     console.log('TIME:   ', new Date().toISOString());
+    console.log('REMOTE: ', req.ip);
+    console.log('METHOD: ', req.method);
+    console.log('URL:    ', req.originalUrl);
     console.log('STATUS: ', res.statusCode);
     console.log('HEADERS:', res.getHeaders());
     console.log('BODY:   ', body);
