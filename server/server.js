@@ -3,6 +3,7 @@ import compression from 'compression';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import fs from 'fs';
 import fetch from 'node-fetch';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -18,6 +19,55 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // VK sends x-www-form-urlencoded
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+
+// ===== Simple persistent store (idempotency for VK payment callbacks) =====
+// VK can resend the *same* notification. For order_status_change повторный ответ
+// должен быть идентичным для того же order_id. Аналогично для subscription_status_change
+// — для того же subscription_id.
+const STORE_PATH = path.join(__dirname, 'payments-store.json');
+
+function loadStore() {
+  try {
+    const raw = fs.readFileSync(STORE_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch (_) {}
+  return { nextAppOrderId: 1000, orders: {}, subscriptions: {} };
+}
+
+const STORE = loadStore();
+
+function saveStore() {
+  try {
+    fs.writeFileSync(STORE_PATH, JSON.stringify(STORE, null, 2), 'utf8');
+  } catch (e) {
+    console.error('[STORE] failed to save', e);
+  }
+}
+
+function allocAppOrderId() {
+  const id = Number(STORE.nextAppOrderId || 1000);
+  STORE.nextAppOrderId = id + 1;
+  return id;
+}
+
+function getOrCreateOrderReply(orderId) {
+  const key = String(orderId);
+  if (STORE.orders[key]) return STORE.orders[key];
+  const reply = { order_id: Number(orderId), app_order_id: allocAppOrderId() };
+  STORE.orders[key] = reply;
+  saveStore();
+  return reply;
+}
+
+function getOrCreateSubscriptionReply(subscriptionId) {
+  const key = String(subscriptionId);
+  if (STORE.subscriptions[key]) return STORE.subscriptions[key];
+  const reply = { subscription_id: Number(subscriptionId), app_order_id: allocAppOrderId() };
+  STORE.subscriptions[key] = reply;
+  saveStore();
+  return reply;
+}
 
 // ===== Helpers =====
 function base64url(input){return input.replace(/\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'');}
@@ -71,6 +121,20 @@ const CATALOG = {
     item_id: 'convert_all_1',
     title: 'Превратить все снежинки',
     price: 1
+  }
+};
+
+// ===== Subscriptions catalog for get_subscription =====
+// period: возможные значения 3/7/30 дней (для 1 месяца — 30).
+const SUBSCRIPTIONS = {
+  // 1 месяц за 2 голоса (возобновляемая подписка)
+  subscription_1m_2_votes: {
+    item_id: 'subscription_1m_2_votes',
+    title: 'Подписка на 1 месяц',
+    price: 2,
+    period: 30,
+    // trial_duration: 3,
+    // expiration: 600,
   }
 };
 
@@ -143,7 +207,7 @@ app.all('/api/payments/callback', async (req, res) => {
       const itemId = body.item || body.item_id;
       const product = CATALOG[itemId];
       if (!product) {
-        return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
+        return res.json({ error: { error_code: 20, error_msg: 'Product does not exist', critical: true } });
       }
       const payload = { response: { item_id: product.item_id, title: product.title, price: product.price } };
       //console.log('[VK PAY][RES]', 200, payload);
@@ -151,12 +215,35 @@ app.all('/api/payments/callback', async (req, res) => {
 
     }
 
+    if (type === 'get_subscription' || type === 'get_subscription_test') {
+      // VK sends subscription item name in `item` (client-controlled).
+      const itemId = body.item || body.item_id;
+      const sub = SUBSCRIPTIONS[itemId];
+      if (!sub) {
+        return res.json({ error: { error_code: 20, error_msg: 'Subscription does not exist', critical: true } });
+      }
+
+      const response = {
+        // NOTE: VK docs often show item_id as int, но на практике можно не передавать.
+        // Мы оставляем строковый идентификатор, чтобы легко сопоставлять с app-логикой.
+        item_id: sub.item_id,
+        title: sub.title,
+        price: sub.price,
+        period: sub.period,
+      };
+      if (sub.trial_duration) response.trial_duration = sub.trial_duration;
+      if (sub.expiration !== undefined) response.expiration = sub.expiration;
+
+      return res.json({ response });
+    }
+
     if (type === 'order_status_change' || type === 'order_status_change_test') {
       const status = body.status;
       const order_id = body.order_id;
       if (status === 'chargeable') {
-        const appOrderId = `${Date.now()}_${order_id}`;
-        const payload = { response: { order_id: Number(order_id), app_order_id: String(appOrderId) } };
+        // Must be idempotent for the same order_id.
+        const reply = getOrCreateOrderReply(order_id);
+        const payload = { response: reply };
         //console.log('[VK PAY][RES]', 200, payload);
         return res.json(payload);
       }
@@ -164,6 +251,40 @@ app.all('/api/payments/callback', async (req, res) => {
       const payload = { response: 1 };
       //console.log('[VK PAY][RES]', 200, payload);
       return res.json(payload);
+    }
+
+    if (type === 'subscription_status_change' || type === 'subscription_status_change_test') {
+      const status = body.status;
+      const subscription_id = body.subscription_id;
+
+      if (subscription_id === undefined || subscription_id === null || subscription_id === '') {
+        return res.json({ error: { error_code: 11, error_msg: 'Bad request: missing subscription_id', critical: true } });
+      }
+
+      // Defensive checks against tampering
+      const itemId = body.item_id;
+      const sub = SUBSCRIPTIONS[itemId];
+      if (!sub) {
+        return res.json({ error: { error_code: 20, error_msg: 'Subscription does not exist', critical: true } });
+      }
+      const price = Number(body.item_price);
+      if (Number.isFinite(price) && price !== Number(sub.price)) {
+        return res.json({ error: { error_code: 11, error_msg: 'Bad request: item_price mismatch', critical: true } });
+      }
+
+      // For chargeable we MUST return subscription_id + app_order_id,
+      // and response must be identical if VK resends the same notification.
+      if (status === 'chargeable') {
+        const reply = getOrCreateSubscriptionReply(subscription_id);
+        return res.json({ response: reply });
+      }
+
+      // For active/cancelled we acknowledge and also return subscription_id
+      // (safe, and helps debugging/logging).
+      const known = STORE.subscriptions[String(subscription_id)];
+      const response = { subscription_id: Number(subscription_id) };
+      if (known && known.app_order_id != null) response.app_order_id = known.app_order_id;
+      return res.json({ response });
     }
 
     // Fallback OK
