@@ -320,7 +320,7 @@ const SUBSCRIPTION_ITEM_1M_2VOTES = 'subscription_1m_2_votes';
   btn.addEventListener('click', async () => {
     const supported = !!(bridge && bridge.supports && bridge.supports(method));
     if (!supported) {
-      alert('Метод VKWebAppShowSubscriptionBox не поддерживается в текущем клиенте.');
+      console.warn('Метод VKWebAppShowSubscriptionBox не поддерживается в текущем клиенте.');
       return;
     }
 
@@ -329,10 +329,10 @@ const SUBSCRIPTION_ITEM_1M_2VOTES = 'subscription_1m_2_votes';
         action: 'create',
         item: SUBSCRIPTION_ITEM_1M_2VOTES,
       });
-      alert('Подписка оформлена: ' + JSON.stringify(res));
+      console.warn('Подписка оформлена: ' + JSON.stringify(res));
     } catch (err) {
       const detail = err && (err.error_data || err.data || err.message || err.toString());
-      alert('Ошибка оформления подписки: ' + JSON.stringify(detail));
+      console.warn('Ошибка оформления подписки: ' + JSON.stringify(detail));
     }
   });
 })();
@@ -365,11 +365,11 @@ const SUBSCRIPTION_ITEM_1M_2VOTES = 'subscription_1m_2_votes';
     try {
       const res = await bridge.send(method, params);
       log('result:', res);
-      alert('VKWebAppShowSubscriptionBox result: ' + JSON.stringify(res));
+      console.warn('VKWebAppShowSubscriptionBox result: ' + JSON.stringify(res));
     } catch (err) {
       log('error:', err);
       const detail = err && (err.error_data || err.data || err.message || err.toString());
-      alert('VKWebAppShowSubscriptionBox error: ' + JSON.stringify(detail));
+      console.warn('VKWebAppShowSubscriptionBox error: ' + JSON.stringify(detail));
     }
   });
 })();
