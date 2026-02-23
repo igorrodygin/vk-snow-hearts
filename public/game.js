@@ -305,6 +305,39 @@ if (btnReward) {
 })();
 // ===== /Native Ads =====
 
+// ===== Subscription: recurring 1 month (2 votes) =====
+// IMPORTANT:
+// 1) В кабинете VK Mini Apps нужно создать подписку (Subscriptions) сроком 1 месяц и ценой 2 голоса.
+// 2) Её идентификатор (item) подставьте ниже.
+const SUBSCRIPTION_ITEM_1M_2VOTES = 'subscription_1m_2_votes';
+
+(function(){
+  const method = 'VKWebAppShowSubscriptionBox';
+  const btn = document.getElementById('subscribe1mBtn');
+
+  if (!btn) return;
+
+  btn.addEventListener('click', async () => {
+    const supported = !!(bridge && bridge.supports && bridge.supports(method));
+    if (!supported) {
+      alert('Метод VKWebAppShowSubscriptionBox не поддерживается в текущем клиенте.');
+      return;
+    }
+
+    try {
+      const res = await bridge.send(method, {
+        action: 'create',
+        item: SUBSCRIPTION_ITEM_1M_2VOTES,
+      });
+      alert('Подписка оформлена: ' + JSON.stringify(res));
+    } catch (err) {
+      const detail = err && (err.error_data || err.data || err.message || err.toString());
+      alert('Ошибка оформления подписки: ' + JSON.stringify(detail));
+    }
+  });
+})();
+// ===== /Subscription: recurring 1 month (2 votes) =====
+
 // ===== Subscription test button (VKWebAppShowSubscriptionBox) =====
 (function(){
   const method = 'VKWebAppShowSubscriptionBox';
@@ -324,7 +357,7 @@ if (btnReward) {
     // ✅ Обязательные параметры для теста подписки
     const params = {
       action,                                // create / cancel
-      item: 'subscription_convert_all_1',    // идентификатор подписки
+      item: SUBSCRIPTION_ITEM_1M_2VOTES,     // идентификатор подписки (по умолчанию — месячная за 2 голоса)
     };
     if (subscription_id) params.subscription_id = subscription_id;
 
