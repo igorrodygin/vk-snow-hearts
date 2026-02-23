@@ -56,12 +56,12 @@ function vkPaymentsCheckSig(params, appSecret) {
 }
 
 // ===== Debug logging (remove after debug) =====
-const DEBUG_PAY_LOG = process.env.DEBUG_PAY_LOG === '1';
+const DEBUG_PAY_LOG = process.env.DEBUG_PAY_LOG === '0';
 app.all('/api/payments/callback', (req, res, next) => {
-  //if (DEBUG_PAY_LOG) {
+  if (DEBUG_PAY_LOG) {
     const body = req.method === 'GET' ? req.query : req.body;
     console.log('[VK PAY][REQ]', req.method, body);
-  //}
+  }
   next();
 });
 
@@ -74,7 +74,57 @@ const CATALOG = {
   }
 };
 
+function fullHttpLogger(req, res, next) {
+  const start = Date.now();
+
+  console.log('\n==================== HTTP IN ====================');
+  console.log('TIME:   ', new Date().toISOString());
+  console.log('REMOTE: ', req.ip);
+  console.log('METHOD: ', req.method);
+  console.log('URL:    ', req.originalUrl);
+  console.log('HEADERS:', req.headers);
+  console.log('QUERY:  ', req.query);
+  console.log('BODY:   ', req.body);
+
+  if (req.rawBody) {
+    console.log('RAWBODY:', req.rawBody.toString('utf8'));
+  } else {
+    console.log('RAWBODY: <no rawBody captured>');
+  }
+
+  // --- capture response ---
+  const chunks = [];
+  const origWrite = res.write.bind(res);
+  const origEnd = res.end.bind(res);
+
+  res.write = (chunk, encoding, cb) => {
+    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
+    return origWrite(chunk, encoding, cb);
+  };
+
+  res.end = (chunk, encoding, cb) => {
+    if (chunk) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding));
+    return origEnd(chunk, encoding, cb);
+  };
+
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    const body = Buffer.concat(chunks).toString('utf8');
+
+    console.log('==================== HTTP OUT ===================');
+    console.log('TIME:   ', new Date().toISOString());
+    console.log('STATUS: ', res.statusCode);
+    console.log('HEADERS:', res.getHeaders());
+    console.log('BODY:   ', body);
+    console.log('DUR_MS: ', ms);
+    console.log('=================================================\n');
+  });
+
+  next();
+}
+
 // ===== Payments Callback =====
+app.use(['/api/payments/callback'], fullHttpLogger);
 app.all('/api/payments/callback', async (req, res) => {
   try {
     const body = req.method === 'GET' ? req.query : req.body;
@@ -96,7 +146,7 @@ app.all('/api/payments/callback', async (req, res) => {
         return res.json({ error: { error_code: 20, error_msg: 'Item not found' } });
       }
       const payload = { response: { item_id: product.item_id, title: product.title, price: product.price } };
-      console.log('[VK PAY][RES]', 200, payload);
+      //console.log('[VK PAY][RES]', 200, payload);
       return res.json(payload);
 
     }
@@ -107,12 +157,12 @@ app.all('/api/payments/callback', async (req, res) => {
       if (status === 'chargeable') {
         const appOrderId = `${Date.now()}_${order_id}`;
         const payload = { response: { order_id: Number(order_id), app_order_id: String(appOrderId) } };
-        console.log('[VK PAY][RES]', 200, payload);
+        //console.log('[VK PAY][RES]', 200, payload);
         return res.json(payload);
       }
       // paid / cancel / other — acknowledge
       const payload = { response: 1 };
-      console.log('[VK PAY][RES]', 200, payload);
+      //console.log('[VK PAY][RES]', 200, payload);
       return res.json(payload);
     }
 
@@ -148,7 +198,7 @@ app.post('/api/orders/verify', async (req,res)=>{
 // Works via HTTP GET (per docs), but we accept ALL to be safe and parse from query/body.
 // Response MUST be application/json or application/xml; we return JSON.
 // OK will retry up to 3 times if non-200 or invalid response.
-const DEBUG_OK_LOG = process.env.DEBUG_OK_LOG === '1';
+const DEBUG_OK_LOG = process.env.DEBUG_OK_LOG === '0';
 const OK_ENFORCE_GET = process.env.OK_ENFORCE_GET === '0'; // set to '1' to enforce GET-only
 
 // Compute signature: sig = MD5( concat(sorted key=value, without 'sig') + OK_SECRET_KEY )
@@ -174,6 +224,7 @@ function okJsonError(code, msg) {
 }
 
 // Endpoint for OK callbacks (OK может вызывать и /api/payments/callback)
+app.use(['/api/ok/callback', '/api/payments/callback'], fullHttpLogger);
 app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
   try {
     if (OK_ENFORCE_GET && req.method !== 'GET') {
@@ -182,7 +233,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
     }
 
     const body = req.method === 'GET' ? req.query : (req.body || {});
-    if (DEBUG_OK_LOG) console.log('[OK PAY][REQ]', req.method, body);
+    //if (DEBUG_OK_LOG) console.log('[OK PAY][REQ]', req.method, body);
 
     const { OK_SECRET_KEY = '' } = process.env;
     if (!OK_SECRET_KEY) {
@@ -192,7 +243,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
 
     // signature
     if (!okCheckSig(body, OK_SECRET_KEY)) {
-      if (DEBUG_OK_LOG) console.log('[OK PAY] sig mismatch', body);
+      //if (DEBUG_OK_LOG) console.log('[OK PAY] sig mismatch', body);
       res.set('Invocation-error', '104');
       return res.status(403).json(okJsonError(104, 'PARAM_SIGNATURE : Invalid signature'));
     }
@@ -211,7 +262,7 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
         res.set('Invocation-error', '1001');
         return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Unknown product_code'));
       }
-      if (Number.isFinite(product.price) && amount !== Number(product.price)) {
+      if (Number.isFinite(product.price) && amount == Number(product.price)) {
         res.set('Invocation-error', '1001');
         return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Amount mismatch'));
       }
@@ -219,10 +270,10 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
 
     // Success confirmation
     res.type('application/json');
-    console.log('[OK PAY][RES]', 200, true);
+    //console.log('[OK PAY][RES]', 200, true);
     return res.status(200).send(true);
   } catch (e) {
-    console.error('[OK PAY] callback error', e);
+    //console.error('[OK PAY] callback error', e);
     res.set('Invocation-error', '9999');
     return res.status(500).json(okJsonError(9999, 'SYSTEM : server error'));
   }
