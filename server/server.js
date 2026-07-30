@@ -295,25 +295,6 @@ app.all('/api/payments/callback', async (req, res) => {
   }
 });
 
-// ===== Client verify via orders.getById =====
-app.post('/api/orders/verify', async (req,res)=>{
-  try{
-    const { app_order_id, item_id, vk_params } = req.body||{};
-    if(!app_order_id) return res.status(400).json({ok:false,error:'no_order'});
-    const { VK_APP_SECRET, VK_SERVICE_TOKEN, VK_API_VERSION='5.131', VERIFY_SIGN='true', VK_TEST_PAY='0' }=process.env;
-    if(VERIFY_SIGN==='true' && (!vk_params || !verifyVKSign(vk_params,VK_APP_SECRET))) return res.status(403).json({ok:false,error:'bad_sign'});
-    const params = new URLSearchParams({v:VK_API_VERSION,access_token:VK_SERVICE_TOKEN,order_id:String(app_order_id)});
-    if(VK_TEST_PAY==='1') params.set('test_mode','1');
-    const r = await fetch('https://api.vk.com/method/orders.getById?'+params.toString());
-    const j = await r.json();
-    const o = j.response && (j.response[0]||j.response);
-    if(!o) return res.status(404).json({ok:false,error:'not_found'});
-    if(o.status==='charged' && (!item_id || o.item===item_id) && o.amount>=1) return res.json({ok:true});
-    return res.status(409).json({ok:false,error:'not_charged',o});
-  }catch(e){console.error(e);res.status(500).json({ok:false,error:'server'});}
-});
-
-
 // ===== Odnoklassniki (OK) Payments — callbacks.payment =====
 // Docs: https://apiok.ru/dev/methods/rest/callbacks/callbacks.payment
 // Works via HTTP GET (per docs), but we accept ALL to be safe and parse from query/body.
@@ -383,9 +364,9 @@ app.all(['/api/ok/callback', '/api/payments/callback'], async (req, res) => {
         res.set('Invocation-error', '1001');
         return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Unknown product_code'));
       }
-      if (Number.isFinite(product.price) && amount == Number(product.price)) {
+      if (Number.isFinite(product.price) && amount == !Number(product.price)) {
         res.set('Invocation-error', '1001');
-        return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Amount mismatch'));
+        return res.status(400).json(okJsonError(1001, 'CALLBACK_INVALID_PAYMENT : Price amount mismatch'));
       }
     }
 
