@@ -144,17 +144,11 @@ function fullHttpLogger(req, res, next) {
   console.log('\n==================== HTTP IN ====================');
   console.log('TIME:   ', new Date().toISOString());
   console.log('REMOTE: ', req.ip);
-  console.log('METHOD: ', req.method);
-  console.log('URL:    ', req.originalUrl);
-  console.log('HEADERS:', req.headers);
-  console.log('QUERY:  ', req.query);
-  console.log('BODY:   ', req.body);
-
-  if (req.rawBody) {
-    console.log('RAWBODY:', req.rawBody.toString('utf8'));
-  } else {
-    console.log('RAWBODY: <no rawBody captured>');
-  }
+  console.log('METHOD:       ', req.method);
+  console.log('URL:          ', req.originalUrl);
+  console.log('HEADERS:      ', req.headers);
+  console.log('QUERY:        ', req.query);
+  console.log('REQUEST BODY: ', req.body);
 
   // --- capture response ---
   const chunks = [];
@@ -176,11 +170,11 @@ function fullHttpLogger(req, res, next) {
     const body = Buffer.concat(chunks).toString('utf8');
 
     console.log('==================== HTTP OUT ===================');
-    console.log('TIME:   ', new Date().toISOString());
-    console.log('STATUS: ', res.statusCode);
-    console.log('HEADERS:', res.getHeaders());
-    console.log('BODY:   ', body);
-    console.log('DUR_MS: ', ms);
+    console.log('TIME:        ', new Date().toISOString());
+    console.log('STATUS:      ', res.statusCode);
+    console.log('HEADERS:     ', res.getHeaders());
+    console.log('RESPONSE BODY:', body);
+    console.log('DUR_MS:      ', ms);
     console.log('=================================================\n');
   });
 
@@ -316,7 +310,10 @@ function okCheckSig(params, secret) {
 
 // Simple catalog check (map OK product_code to our items/prices in OKs)
 const OK_CATALOG = {
-  convert_all_1: { price: 1, title: 'Превратить все снежинки' }
+  convert_all_1: {
+    price: 1,
+    title: 'Превратить все снежинки'
+  }
 };
 
 function okJsonError(code, msg) {
